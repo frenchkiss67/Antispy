@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 const KEYS = [
   ['1', '2', '3'],
@@ -8,6 +9,15 @@ const KEYS = [
 ];
 
 export default function PinPad({ onDigit, onDelete, disabled }) {
+  const handlePress = (key) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (key === '⌫') {
+      onDelete();
+    } else {
+      onDigit(key);
+    }
+  };
+
   return (
     <View style={styles.pad}>
       {KEYS.map((row, rowIndex) => (
@@ -20,7 +30,7 @@ export default function PinPad({ onDigit, onDelete, disabled }) {
                 key={keyIndex}
                 style={styles.key}
                 disabled={disabled}
-                onPress={() => (key === '⌫' ? onDelete() : onDigit(key))}
+                onPress={() => handlePress(key)}
               >
                 <Text style={styles.keyText}>{key}</Text>
               </TouchableOpacity>

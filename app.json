@@ -4,9 +4,12 @@
     "slug": "antispy",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0d1117"
     },
     "ios": {
@@ -19,7 +22,11 @@
     },
     "android": {
       "package": "com.antispy.app",
-      "permissions": ["CAMERA"]
+      "permissions": ["CAMERA"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d1117"
+      }
     },
     "plugins": [
       [
@@ -33,6 +40,18 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Antispy utilise Face ID pour déverrouiller l'application sans prendre de photo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Antispy enregistre la position des tentatives de déverrouillage (utile en cas de vol)."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Antispy importe des photos de votre galerie vers le coffre-fort privé."
         }
       ]
     ]

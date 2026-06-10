@@ -6,24 +6,40 @@ Le déverrouillage par **empreinte digitale ou visage** (Touch ID / Face ID /
 biométrie Android) est aussi possible et **ne déclenche aucune photo** :
 seule la saisie du code PIN prend une photo.
 
-## Fonctionnement
+## Fonctionnalités
 
-1. **Premier lancement** : vous choisissez un code PIN à 4 chiffres
-   (saisi deux fois pour confirmation). Il est stocké haché (SHA-256 + sel)
-   dans le stockage sécurisé du téléphone (Keychain iOS / Keystore Android).
-2. **Écran de verrouillage** : dès qu'un code PIN complet est tapé — correct
-   ou non — la caméra frontale prend une photo en silence (caméra invisible,
-   pas d'animation d'obturateur).
-   Si l'appareil dispose de la biométrie (empreinte ou visage), la
-   demande de déverrouillage biométrique s'affiche automatiquement et un
-   bouton permet de la relancer : un déverrouillage biométrique réussi
-   **ne prend pas de photo**.
-3. **Journal** : après déverrouillage, vous voyez la liste des tentatives :
-   photo de la personne, date/heure, et si le code était correct ou erroné.
-   Les photos sont stockées uniquement dans l'espace privé de l'application
-   (pas dans la galerie du téléphone).
-4. L'application se reverrouille automatiquement dès qu'elle passe en
-   arrière-plan.
+- **Code PIN à 4 chiffres** choisi au premier lancement, stocké haché
+  (SHA-256 + sel) dans le stockage sécurisé du téléphone
+  (Keychain iOS / Keystore Android), modifiable dans les réglages.
+- **Photo discrète à chaque saisie du PIN** : 1 photo si le code est
+  correct, **rafale de 3 photos** s'il est erroné (plus de chances d'avoir
+  un visage net). Caméra invisible, pas d'animation d'obturateur.
+- **Déverrouillage biométrique sans photo** : proposé automatiquement à
+  l'ouverture, jamais de capture dans ce cas.
+- **Alerte « pendant votre absence »** : au déverrouillage, un bandeau
+  indique combien de saisies ont eu lieu depuis votre dernier passage,
+  et les tentatives nouvelles sont marquées « NOUVEAU ».
+- **Anti-bruteforce** : après 3 codes erronés, le pavé est bloqué 30 s,
+  puis 1 min, 5 min, 10 min. En mode camouflage, le blocage est invisible :
+  même le bon code n'ouvre pas pendant le délai.
+- **Journal détaillé** : photo en plein écran (balayage entre les clichés
+  de la rafale), date/heure, position GPS, partage et suppression
+  individuelle ou totale.
+- **Mode camouflage** : l'écran de verrouillage devient une vraie
+  calculatrice. Tapez votre PIN puis `=` pour déverrouiller
+  (appui long sur `=` pour la biométrie). Toute saisie de 4 chiffres
+  suivie de `=` est traitée comme une tentative et photographiée.
+- **Coffre-fort** : notes privées et photos importées de la galerie,
+  stockées uniquement dans l'espace privé de l'application.
+- **Alerte distante (webhook)** : à chaque code erroné, l'application
+  envoie en POST JSON la photo (base64), la date et la position vers
+  l'URL de votre choix — compatible [ntfy.sh](https://ntfy.sh), Zapier,
+  Make ou votre propre serveur.
+- **Position GPS des tentatives** (optionnel), utile en cas de vol.
+- **Délai avant reverrouillage** configurable (immédiat, 30 s, 1 min,
+  5 min) quand l'application passe en arrière-plan.
+- **Interface en français et en anglais** (langue du téléphone),
+  retour haptique sur les pavés.
 
 ## Lancer l'application
 
@@ -54,16 +70,33 @@ eas login
 eas build --platform android   # ou --platform ios
 ```
 
+## Exemple de webhook avec ntfy.sh
+
+Aucun serveur à installer : choisissez un nom de sujet secret, puis dans
+les réglages d'Antispy renseignez `https://ntfy.sh/votre-sujet-secret`.
+Installez l'application ntfy sur un autre appareil et abonnez-vous au même
+sujet : vous recevrez une notification à chaque code erroné.
+
 ## Structure du projet
 
 ```
-App.js                       Navigation entre les écrans (setup / verrouillé / journal)
-src/security.js              Hachage et vérification du PIN (expo-crypto + expo-secure-store)
-src/captures.js              Enregistrement des photos et de l'index (expo-file-system)
-src/components/PinPad.js     Pavé numérique et indicateurs de saisie
-src/screens/SetupScreen.js   Création du code PIN au premier lancement
-src/screens/LockScreen.js    Saisie du PIN + capture photo discrète (caméra frontale)
-src/screens/JournalScreen.js Journal des tentatives (photo, date, correct/erroné)
+App.js                          Navigation, onglets, reverrouillage en arrière-plan
+src/i18n.js                     Traductions français / anglais
+src/security.js                 Hachage du PIN, anti-bruteforce
+src/settings.js                 Réglages persistants
+src/captures.js                 Stockage des photos de surveillance
+src/vault.js                    Stockage du coffre-fort (notes, photos)
+src/attempt.js                  Traitement d'une tentative : rafale, GPS, webhook
+src/webhook.js                  Envoi de l'alerte distante
+src/components/PinPad.js        Pavé numérique avec retour haptique
+src/screens/SetupScreen.js      Création du code PIN
+src/screens/LockScreen.js       Verrouillage classique + photo discrète
+src/screens/CalculatorScreen.js Verrouillage camouflé en calculatrice
+src/screens/JournalScreen.js    Journal des tentatives, plein écran, partage
+src/screens/VaultScreen.js      Coffre-fort (notes + photos)
+src/screens/SettingsScreen.js   Réglages
+src/screens/ChangePinScreen.js  Changement du code PIN
+scripts/generate-assets.js      Génération de l'icône et du splash screen
 ```
 
 ## Remarques

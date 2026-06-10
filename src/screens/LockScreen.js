@@ -3,10 +3,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import PinPad, { PinDots } from '../components/PinPad';
-import { verifyPin } from '../security';
-import { saveCapture } from '../captures';
+import { verifyPin, getLockUntil, registerAttempt } from '../security';
+import { recordAttempt } from '../attempt';
+import t from '../i18n';
 
-export default function LockScreen({ pinLength, onUnlock }) {
+export default function LockScreen({ pinLength, settings, onUnlock }) {
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
@@ -14,6 +15,10 @@ export default function LockScreen({ pinLength, onUnlock }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [lockUntil, setLockUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+
+  const lockRemaining = Math.max(0, Math.ceil((lockUntil - now) / 1000));
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -21,14 +26,27 @@ export default function LockScreen({ pinLength, onUnlock }) {
     }
   }, [permission]);
 
+  useEffect(() => {
+    getLockUntil().then(setLockUntil);
+  }, []);
+
+  // Compte à rebours pendant le blocage anti-bruteforce.
+  useEffect(() => {
+    if (lockUntil <= Date.now()) {
+      return undefined;
+    }
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [lockUntil]);
+
   // Déverrouillage par empreinte ou visage : aucune photo n'est prise.
   const handleBiometric = async () => {
     if (busy) {
       return;
     }
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Déverrouiller Antispy',
-      cancelLabel: 'Utiliser le code PIN',
+      promptMessage: t('biometricPrompt'),
+      cancelLabel: t('biometricCancel'),
       disableDeviceFallback: true,
     });
     if (result.success) {
@@ -39,7 +57,8 @@ export default function LockScreen({ pinLength, onUnlock }) {
   useEffect(() => {
     (async () => {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
+      const enrolled =
+        hasHardware && (await LocalAuthentication.isEnrolledAsync());
       setBiometricAvailable(enrolled);
       if (enrolled) {
         handleBiometric();
@@ -47,25 +66,8 @@ export default function LockScreen({ pinLength, onUnlock }) {
     })();
   }, []);
 
-  // Photographie silencieusement la personne en train de saisir le code.
-  const capturePhoto = async () => {
-    if (!cameraRef.current || !cameraReady || !permission?.granted) {
-      return null;
-    }
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.6,
-        skipProcessing: true,
-        shutterSound: false,
-      });
-      return photo?.uri ?? null;
-    } catch (e) {
-      return null;
-    }
-  };
-
   const handleDigit = async (digit) => {
-    if (busy || pin.length >= pinLength) {
+    if (busy || lockRemaining > 0 || pin.length >= pinLength) {
       return;
     }
     setError(false);
@@ -75,15 +77,18 @@ export default function LockScreen({ pinLength, onUnlock }) {
       return;
     }
     setBusy(true);
-    const photoUri = await capturePhoto();
     const success = await verifyPin(next);
-    if (photoUri) {
-      try {
-        await saveCapture(photoUri, success);
-      } catch (e) {
-        // La photo n'a pas pu être enregistrée : on ne bloque pas la saisie.
-      }
+    const until = await registerAttempt(success);
+    if (until) {
+      setLockUntil(until);
+      setNow(Date.now());
     }
+    await recordAttempt({
+      cameraRef,
+      cameraReady: cameraReady && permission?.granted,
+      success,
+      settings,
+    });
     if (success) {
       onUnlock();
     } else {
@@ -104,26 +109,29 @@ export default function LockScreen({ pinLength, onUnlock }) {
           style={styles.hiddenCamera}
         />
       )}
-      <Text style={styles.title}>🛡️ Antispy</Text>
-      <Text style={styles.subtitle}>Saisissez votre code PIN</Text>
-      {error && <Text style={styles.error}>Code PIN incorrect</Text>}
+      <Text style={styles.title}>🛡️ {t('appName')}</Text>
+      <Text style={styles.subtitle}>{t('enterPin')}</Text>
+      {lockRemaining > 0 ? (
+        <Text style={styles.error}>{t('lockedFor', lockRemaining)}</Text>
+      ) : (
+        error && <Text style={styles.error}>{t('wrongPin')}</Text>
+      )}
       <PinDots length={pinLength} filled={pin.length} error={error} />
       <PinPad
         onDigit={handleDigit}
         onDelete={() => setPin(pin.slice(0, -1))}
-        disabled={busy}
+        disabled={busy || lockRemaining > 0}
       />
       {biometricAvailable && (
-        <TouchableOpacity style={styles.biometricButton} onPress={handleBiometric}>
-          <Text style={styles.biometricButtonText}>
-            👤 Déverrouiller par empreinte ou visage
-          </Text>
+        <TouchableOpacity
+          style={styles.biometricButton}
+          onPress={handleBiometric}
+        >
+          <Text style={styles.biometricButtonText}>{t('biometricButton')}</Text>
         </TouchableOpacity>
       )}
       {permission && !permission.granted && (
-        <Text style={styles.warning}>
-          Autorisez la caméra pour activer la photo de surveillance.
-        </Text>
+        <Text style={styles.warning}>{t('cameraWarning')}</Text>
       )}
     </View>
   );

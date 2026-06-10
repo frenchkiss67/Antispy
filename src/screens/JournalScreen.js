@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   FlatList,
   Image,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { deleteAllCaptures, listCaptures } from '../captures';
+import * as Sharing from 'expo-sharing';
+import { deleteAllCaptures, deleteCapture, listCaptures } from '../captures';
+import { loadSettings, saveSettings } from '../settings';
+import t from '../i18n';
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleString('fr-FR', {
+  return new Date(iso).toLocaleString(undefined, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -21,42 +27,70 @@ function formatDate(iso) {
   });
 }
 
-export default function JournalScreen({ onLock }) {
+export default function JournalScreen() {
   const [captures, setCaptures] = useState([]);
+  const [lastSeen, setLastSeen] = useState(null);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    listCaptures().then(setCaptures);
+    (async () => {
+      const settings = await loadSettings();
+      setLastSeen(settings.lastSeen);
+      setCaptures(await listCaptures());
+      await saveSettings({ lastSeen: new Date().toISOString() });
+    })();
   }, []);
 
+  const isNew = (capture) => lastSeen && capture.date > lastSeen;
+  const newCaptures = captures.filter(isNew);
+  const newFailed = newCaptures.filter((c) => !c.success).length;
+
   const handleDeleteAll = () => {
-    Alert.alert(
-      'Tout supprimer',
-      'Supprimer toutes les photos de surveillance ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => setCaptures(await deleteAllCaptures()),
-        },
-      ]
-    );
+    Alert.alert(t('deleteAllTitle'), t('deleteAllMessage'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => setCaptures(await deleteAllCaptures()),
+      },
+    ]);
   };
+
+  const handleDeleteOne = (capture) => {
+    Alert.alert(t('delete'), t('deleteOneMessage'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          setCaptures(await deleteCapture(capture.id));
+          setSelected(null);
+        },
+      },
+    ]);
+  };
+
+  const handleShare = async (uri) => {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri);
+    }
+  };
+
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Journal des saisies</Text>
-        <TouchableOpacity style={styles.lockButton} onPress={onLock}>
-          <Text style={styles.lockButtonText}>🔒 Verrouiller</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.title}>{t('journalTitle')}</Text>
+      {newCaptures.length > 0 && (
+        <View style={[styles.banner, newFailed > 0 && styles.bannerAlert]}>
+          <Text style={styles.bannerText}>
+            {t('absenceAlert', newCaptures.length, newFailed)}
+          </Text>
+        </View>
+      )}
       {captures.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            Aucune photo pour l'instant.{'\n'}Chaque saisie du code PIN
-            déclenche une photo de la personne devant l'écran.
-          </Text>
+          <Text style={styles.emptyText}>{t('journalEmpty')}</Text>
         </View>
       ) : (
         <FlatList
@@ -64,8 +98,11 @@ export default function JournalScreen({ onLock }) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Image source={{ uri: item.uri }} style={styles.photo} />
+            <TouchableOpacity
+              style={[styles.card, isNew(item) && styles.cardNew]}
+              onPress={() => setSelected(item)}
+            >
+              <Image source={{ uri: item.uris[0] }} style={styles.photo} />
               <View style={styles.cardInfo}>
                 <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
                 <Text
@@ -74,18 +111,81 @@ export default function JournalScreen({ onLock }) {
                     item.success ? styles.badgeOk : styles.badgeKo,
                   ]}
                 >
-                  {item.success ? '✓ Code correct' : '✗ Code erroné'}
+                  {item.success ? t('codeOk') : t('codeKo')}
+                </Text>
+                <Text style={styles.cardMeta}>
+                  {t('photoCount', item.uris.length)}
+                  {item.location
+                    ? `  ·  📍 ${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`
+                    : ''}
                 </Text>
               </View>
-            </View>
+              {isNew(item) && (
+                <View style={styles.newBadge}>
+                  <Text style={styles.newBadgeText}>{t('newBadge')}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           )}
         />
       )}
       {captures.length > 0 && (
         <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAll}>
-          <Text style={styles.deleteButtonText}>Tout supprimer</Text>
+          <Text style={styles.deleteButtonText}>{t('deleteAll')}</Text>
         </TouchableOpacity>
       )}
+
+      <Modal visible={selected !== null} animationType="fade" transparent>
+        {selected && (
+          <View style={styles.modal}>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+            >
+              {selected.uris.map((uri) => (
+                <Image
+                  key={uri}
+                  source={{ uri }}
+                  style={{ width: screenWidth, height: screenHeight }}
+                  resizeMode="contain"
+                />
+              ))}
+            </ScrollView>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalDate}>{formatDate(selected.date)}</Text>
+              <Text
+                style={[
+                  styles.badge,
+                  selected.success ? styles.badgeOk : styles.badgeKo,
+                ]}
+              >
+                {selected.success ? t('codeOk') : t('codeKo')}
+              </Text>
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => handleShare(selected.uris[0])}
+              >
+                <Text style={styles.modalButtonText}>↗ {t('share')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonDanger]}
+                onPress={() => handleDeleteOne(selected)}
+              >
+                <Text style={styles.modalButtonText}>🗑 {t('delete')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setSelected(null)}
+              >
+                <Text style={styles.modalButtonText}>✕ {t('close')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 }
@@ -96,27 +196,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d1117',
     paddingTop: 60,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
   title: {
     color: '#e6edf3',
     fontSize: 22,
     fontWeight: '700',
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  lockButton: {
-    backgroundColor: '#21262d',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
+  banner: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#1f3a5f',
   },
-  lockButtonText: {
+  bannerAlert: {
+    backgroundColor: '#5a1e1b',
+  },
+  bannerText: {
     color: '#e6edf3',
     fontSize: 14,
+    lineHeight: 20,
   },
   empty: {
     flex: 1,
@@ -141,6 +241,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
+  cardNew: {
+    borderWidth: 1,
+    borderColor: '#58a6ff',
+  },
   photo: {
     width: 90,
     height: 90,
@@ -154,7 +258,7 @@ const styles = StyleSheet.create({
   cardDate: {
     color: '#e6edf3',
     fontSize: 15,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   badge: {
     fontSize: 13,
@@ -165,6 +269,25 @@ const styles = StyleSheet.create({
   },
   badgeKo: {
     color: '#f85149',
+  },
+  cardMeta: {
+    color: '#8b949e',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  newBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#58a6ff',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  newBadgeText: {
+    color: '#0d1117',
+    fontSize: 10,
+    fontWeight: '700',
   },
   deleteButton: {
     margin: 20,
@@ -177,5 +300,43 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  modal: {
+    flex: 1,
+    backgroundColor: '#000000ee',
+  },
+  modalHeader: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalDate: {
+    color: '#e6edf3',
+    fontSize: 15,
+  },
+  modalActions: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  modalButton: {
+    backgroundColor: '#21262d',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalButtonDanger: {
+    backgroundColor: '#da3633',
+  },
+  modalButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
   },
 });

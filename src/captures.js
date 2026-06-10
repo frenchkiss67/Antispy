@@ -10,6 +10,10 @@ async function ensureDir() {
   }
 }
 
+async function writeIndex(captures) {
+  await FileSystem.writeAsStringAsync(INDEX_FILE, JSON.stringify(captures));
+}
+
 export async function listCaptures() {
   try {
     const info = await FileSystem.getInfoAsync(INDEX_FILE);
@@ -17,26 +21,46 @@ export async function listCaptures() {
       return [];
     }
     const content = await FileSystem.readAsStringAsync(INDEX_FILE);
-    return JSON.parse(content);
+    const captures = JSON.parse(content);
+    // Migration de l'ancien format à photo unique ({uri}) vers {uris: []}.
+    return captures.map((c) => (c.uris ? c : { ...c, uris: [c.uri] }));
   } catch (e) {
     return [];
   }
 }
 
-export async function saveCapture(tempUri, success) {
+export async function saveCapture({ tempUris, success, location }) {
   await ensureDir();
   const id = `${Date.now()}`;
-  const destination = `${CAPTURES_DIR}${id}.jpg`;
-  await FileSystem.moveAsync({ from: tempUri, to: destination });
+  const uris = [];
+  for (let i = 0; i < tempUris.length; i++) {
+    const destination = `${CAPTURES_DIR}${id}-${i}.jpg`;
+    await FileSystem.moveAsync({ from: tempUris[i], to: destination });
+    uris.push(destination);
+  }
   const captures = await listCaptures();
   captures.unshift({
     id,
-    uri: destination,
+    uris,
     date: new Date().toISOString(),
     success,
+    location: location ?? null,
   });
-  await FileSystem.writeAsStringAsync(INDEX_FILE, JSON.stringify(captures));
+  await writeIndex(captures);
   return captures;
+}
+
+export async function deleteCapture(id) {
+  const captures = await listCaptures();
+  const target = captures.find((c) => c.id === id);
+  if (target) {
+    for (const uri of target.uris) {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    }
+  }
+  const remaining = captures.filter((c) => c.id !== id);
+  await writeIndex(remaining);
+  return remaining;
 }
 
 export async function deleteAllCaptures() {

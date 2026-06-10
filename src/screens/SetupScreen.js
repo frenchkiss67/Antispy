@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import PinPad, { PinDots } from '../components/PinPad';
 import { savePin } from '../security';
+import t from '../i18n';
 
 const PIN_LENGTH = 4;
 
@@ -38,17 +39,11 @@ export default function SetupScreen({ onDone }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🛡️ Antispy</Text>
+      <Text style={styles.title}>🛡️ {t('appName')}</Text>
       <Text style={styles.subtitle}>
-        {step === 'create'
-          ? 'Choisissez votre code PIN'
-          : 'Confirmez votre code PIN'}
+        {step === 'create' ? t('choosePin') : t('confirmPin')}
       </Text>
-      {error && (
-        <Text style={styles.error}>
-          Les codes ne correspondent pas, recommencez.
-        </Text>
-      )}
+      {error && <Text style={styles.error}>{t('pinMismatch')}</Text>}
       <PinDots length={PIN_LENGTH} filled={pin.length} error={error} />
       <PinPad
         onDigit={handleDigit}
