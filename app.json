@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Antispy",
+    "slug": "antispy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0d1117"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.antispy.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
+      }
+    },
+    "android": {
+      "package": "com.antispy.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}
