@@ -2,7 +2,9 @@
 
 Application mobile **Android / iOS** (React Native + Expo) qui photographie
 discrètement, avec la caméra frontale, **la personne qui saisit le code PIN**.
-Le déverrouillage se fait **uniquement par code PIN** (pas de biométrie).
+Le déverrouillage par **empreinte digitale ou visage** (Touch ID / Face ID /
+biométrie Android) est aussi possible et **ne déclenche aucune photo** :
+seule la saisie du code PIN prend une photo.
 
 ## Fonctionnement
 
@@ -12,6 +14,10 @@ Le déverrouillage se fait **uniquement par code PIN** (pas de biométrie).
 2. **Écran de verrouillage** : dès qu'un code PIN complet est tapé — correct
    ou non — la caméra frontale prend une photo en silence (caméra invisible,
    pas d'animation d'obturateur).
+   Si l'appareil dispose de la biométrie (empreinte ou visage), la
+   demande de déverrouillage biométrique s'affiche automatiquement et un
+   bouton permet de la relancer : un déverrouillage biométrique réussi
+   **ne prend pas de photo**.
 3. **Journal** : après déverrouillage, vous voyez la liste des tentatives :
    photo de la personne, date/heure, et si le code était correct ou erroné.
    Les photos sont stockées uniquement dans l'espace privé de l'application

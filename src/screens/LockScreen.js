@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as LocalAuthentication from 'expo-local-authentication';
 import PinPad, { PinDots } from '../components/PinPad';
 import { verifyPin } from '../security';
 import { saveCapture } from '../captures';
@@ -12,12 +13,39 @@ export default function LockScreen({ pinLength, onUnlock }) {
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
   }, [permission]);
+
+  // Déverrouillage par empreinte ou visage : aucune photo n'est prise.
+  const handleBiometric = async () => {
+    if (busy) {
+      return;
+    }
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Déverrouiller Antispy',
+      cancelLabel: 'Utiliser le code PIN',
+      disableDeviceFallback: true,
+    });
+    if (result.success) {
+      onUnlock();
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
+      setBiometricAvailable(enrolled);
+      if (enrolled) {
+        handleBiometric();
+      }
+    })();
+  }, []);
 
   // Photographie silencieusement la personne en train de saisir le code.
   const capturePhoto = async () => {
@@ -85,6 +113,13 @@ export default function LockScreen({ pinLength, onUnlock }) {
         onDelete={() => setPin(pin.slice(0, -1))}
         disabled={busy}
       />
+      {biometricAvailable && (
+        <TouchableOpacity style={styles.biometricButton} onPress={handleBiometric}>
+          <Text style={styles.biometricButtonText}>
+            👤 Déverrouiller par empreinte ou visage
+          </Text>
+        </TouchableOpacity>
+      )}
       {permission && !permission.granted && (
         <Text style={styles.warning}>
           Autorisez la caméra pour activer la photo de surveillance.
@@ -123,6 +158,17 @@ const styles = StyleSheet.create({
     color: '#f85149',
     fontSize: 14,
     marginTop: 12,
+  },
+  biometricButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#21262d',
+  },
+  biometricButtonText: {
+    color: '#58a6ff',
+    fontSize: 14,
   },
   warning: {
     color: '#d29922',

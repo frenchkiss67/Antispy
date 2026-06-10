@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.antispy.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
+        "NSCameraUsageDescription": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN.",
+        "NSFaceIDUsageDescription": "Antispy utilise Face ID pour déverrouiller l'application sans prendre de photo."
       }
     },
     "android": {
@@ -27,7 +28,13 @@
           "cameraPermission": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Antispy utilise Face ID pour déverrouiller l'application sans prendre de photo."
+        }
+      ]
     ]
   }
 }
