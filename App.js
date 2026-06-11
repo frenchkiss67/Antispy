@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  AppState,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import SetupScreen from './src/screens/SetupScreen';
 import LockScreen from './src/screens/LockScreen';
 import CalculatorScreen from './src/screens/CalculatorScreen';
@@ -13,10 +20,17 @@ import { DEFAULT_SETTINGS, loadSettings } from './src/settings';
 import t from './src/i18n';
 
 export default function App() {
+  // Bloque les captures d'écran (FLAG_SECURE Android, protection iOS).
+  usePreventScreenCapture();
+
   const [screen, setScreen] = useState('loading'); // 'loading' | 'setup' | 'locked' | 'home' | 'changePin'
   const [tab, setTab] = useState('journal'); // 'journal' | 'vault' | 'settings'
   const [pinLength, setPinLength] = useState(4);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  // decoy : session ouverte avec le code de contrainte (faux coffre).
+  const [decoy, setDecoy] = useState(false);
+  const [changePinMode, setChangePinMode] = useState('pin'); // 'pin' | 'duress'
+  const [appActive, setAppActive] = useState(true);
   const settingsRef = useRef(settings);
   const screenRef = useRef(screen);
   const backgroundAtRef = useRef(null);
@@ -38,6 +52,7 @@ export default function App() {
   // Reverrouillage en arrière-plan, avec délai de grâce configurable.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
       const unlocked =
         screenRef.current === 'home' || screenRef.current === 'changePin';
       if (state !== 'active') {
@@ -61,18 +76,25 @@ export default function App() {
   const lock = async () => {
     // Recharge les réglages : lastSeen et options ont pu changer.
     setSettings(await loadSettings());
+    setDecoy(false);
     setTab('journal');
     setScreen('locked');
   };
 
-  const handleUnlock = async () => {
+  const handleUnlock = async (duress) => {
     setSettings(await loadSettings());
+    setDecoy(!!duress);
     setScreen('home');
   };
 
   const handleSetupDone = async () => {
     setPinLength(await getPinLength());
     setScreen('locked');
+  };
+
+  const openChangePin = (mode) => {
+    setChangePinMode(mode);
+    setScreen('changePin');
   };
 
   const handlePinChanged = async () => {
@@ -82,6 +104,7 @@ export default function App() {
   };
 
   const Lock = settings.camouflage ? CalculatorScreen : LockScreen;
+  const unlocked = screen === 'home' || screen === 'changePin';
 
   return (
     <>
@@ -93,6 +116,8 @@ export default function App() {
       {screen === 'changePin' && (
         <ChangePinScreen
           pinLength={pinLength}
+          mode={changePinMode}
+          decoy={decoy}
           onDone={handlePinChanged}
           onCancel={() => setScreen('home')}
         />
@@ -100,13 +125,15 @@ export default function App() {
       {screen === 'home' && (
         <View style={styles.home}>
           <View style={styles.screen}>
-            {tab === 'journal' && <JournalScreen />}
-            {tab === 'vault' && <VaultScreen />}
+            {tab === 'journal' && <JournalScreen decoy={decoy} />}
+            {tab === 'vault' && <VaultScreen decoy={decoy} />}
             {tab === 'settings' && (
               <SettingsScreen
                 settings={settings}
                 onSettingsChange={setSettings}
-                onChangePin={() => setScreen('changePin')}
+                onChangePin={() => openChangePin('pin')}
+                onSetDuress={() => openChangePin('duress')}
+                decoy={decoy}
               />
             )}
           </View>
@@ -128,6 +155,13 @@ export default function App() {
               <Text style={styles.tabItemText}>{t('lock')}</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+      {/* Voile de confidentialité : masque le contenu dans le sélecteur
+          d'applications quand l'app est déverrouillée en arrière-plan. */}
+      {unlocked && !appActive && (
+        <View style={styles.privacyCover}>
+          <Text style={styles.privacyCoverText}>🛡️</Text>
         </View>
       )}
     </>
@@ -161,5 +195,14 @@ const styles = StyleSheet.create({
   tabItemText: {
     color: '#e6edf3',
     fontSize: 13,
+  },
+  privacyCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0d1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  privacyCoverText: {
+    fontSize: 64,
   },
 });

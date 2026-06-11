@@ -3,9 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import PinPad, { PinDots } from '../components/PinPad';
-import { verifyPin, getLockUntil, registerAttempt } from '../security';
+import { verifyPin, verifyDuressPin, registerAttempt } from '../security';
+import { wipeVault } from '../vault';
 import { recordAttempt } from '../attempt';
+import useLockCountdown from '../hooks/useLockCountdown';
 import t from '../i18n';
+
+const WIPE_THRESHOLD = 10;
 
 export default function LockScreen({ pinLength, settings, onUnlock }) {
   const cameraRef = useRef(null);
@@ -15,29 +19,13 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [lockUntil, setLockUntil] = useState(0);
-  const [now, setNow] = useState(Date.now());
-
-  const lockRemaining = Math.max(0, Math.ceil((lockUntil - now) / 1000));
+  const [lockRemaining, setLockRemaining] = useLockCountdown();
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
   }, [permission]);
-
-  useEffect(() => {
-    getLockUntil().then(setLockUntil);
-  }, []);
-
-  // Compte à rebours pendant le blocage anti-bruteforce.
-  useEffect(() => {
-    if (lockUntil <= Date.now()) {
-      return undefined;
-    }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [lockUntil]);
 
   // Déverrouillage par empreinte ou visage : aucune photo n'est prise.
   const handleBiometric = async () => {
@@ -50,7 +38,7 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
       disableDeviceFallback: true,
     });
     if (result.success) {
-      onUnlock();
+      onUnlock(false);
     }
   };
 
@@ -77,20 +65,25 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
       return;
     }
     setBusy(true);
-    const success = await verifyPin(next);
-    const until = await registerAttempt(success);
-    if (until) {
-      setLockUntil(until);
-      setNow(Date.now());
+    const realPin = await verifyPin(next);
+    const duress = !realPin && (await verifyDuressPin(next));
+    const accepted = realPin || duress;
+    const { fails, lockSeconds } = await registerAttempt(accepted);
+    if (lockSeconds > 0) {
+      setLockRemaining(lockSeconds);
+    }
+    if (!accepted && settings.wipeEnabled && fails >= WIPE_THRESHOLD) {
+      await wipeVault();
     }
     await recordAttempt({
       cameraRef,
       cameraReady: cameraReady && permission?.granted,
-      success,
+      success: accepted,
+      duress,
       settings,
     });
-    if (success) {
-      onUnlock();
+    if (accepted) {
+      onUnlock(duress);
     } else {
       setError(true);
       setPin('');

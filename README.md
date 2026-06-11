@@ -41,6 +41,33 @@ seule la saisie du code PIN prend une photo.
 - **Interface en français et en anglais** (langue du téléphone),
   retour haptique sur les pavés.
 
+## Sécurité
+
+- **Chiffrement au repos** : photos de surveillance, coffre-fort, journal
+  et réglages sont chiffrés en AES-256-CTR avec une clé aléatoire de
+  32 octets conservée dans le Keychain iOS / Keystore Android. Les images
+  sont déchiffrées en mémoire uniquement, jamais écrites en clair sur le
+  disque (sauf fichier temporaire le temps d'un partage explicite).
+- **Code de contrainte (duress)** : un second PIN, configurable dans les
+  réglages, ouvre un **faux coffre** vide au départ. Le journal y est
+  vide, la section code de contrainte invisible, et « changer le PIN »
+  n'y modifie que le code de contrainte — jamais le vrai. La saisie du
+  code de contrainte est photographiée et marquée dans le vrai journal.
+- **Effacement d'urgence** (optionnel) : au 10e code erroné consécutif,
+  le vrai coffre est définitivement supprimé (le journal est conservé).
+- **Anti-bruteforce insensible à l'horloge** : le blocage est un compte à
+  rebours décompté par l'application et persisté — changer l'heure du
+  téléphone ne le contourne pas ; fermer l'application le met en pause.
+- **Captures d'écran bloquées** (FLAG_SECURE sur Android) et **voile de
+  confidentialité** dans le sélecteur d'applications.
+- **Webhook HTTPS uniquement** : l'alerte distante refuse les URL en
+  `http://`.
+- **Sauvegardes Android désactivées** (`allowBackup=false`) : les données
+  chiffrées ne partent pas dans les sauvegardes cloud.
+- Limite à connaître : un code PIN à 4 chiffres reste un secret faible ;
+  la protection réelle des données repose sur la clé AES du
+  Keystore/Keychain et sur le verrouillage du téléphone lui-même.
+
 ## Lancer l'application
 
 ```bash
@@ -80,15 +107,19 @@ sujet : vous recevrez une notification à chaque code erroné.
 ## Structure du projet
 
 ```
-App.js                          Navigation, onglets, reverrouillage en arrière-plan
+App.js                          Navigation, onglets, reverrouillage, voile de confidentialité
 src/i18n.js                     Traductions français / anglais
-src/security.js                 Hachage du PIN, anti-bruteforce
-src/settings.js                 Réglages persistants
-src/captures.js                 Stockage des photos de surveillance
-src/vault.js                    Stockage du coffre-fort (notes, photos)
+src/security.js                 Hachage des PIN (principal + contrainte), anti-bruteforce
+src/cryptoStore.js              Chiffrement au repos (AES-256-CTR, clé en Keystore/Keychain)
+src/base64.js                   Encodage base64 / UTF-8 pur JavaScript
+src/settings.js                 Réglages persistants chiffrés
+src/captures.js                 Stockage chiffré des photos de surveillance
+src/vault.js                    Coffre-fort chiffré (vrai + leurre), effacement d'urgence
 src/attempt.js                  Traitement d'une tentative : rafale, GPS, webhook
-src/webhook.js                  Envoi de l'alerte distante
+src/webhook.js                  Envoi de l'alerte distante (HTTPS uniquement)
+src/hooks/useLockCountdown.js   Compte à rebours anti-bruteforce persistant
 src/components/PinPad.js        Pavé numérique avec retour haptique
+src/components/DecryptedImage.js Affichage d'images chiffrées (déchiffrement en mémoire)
 src/screens/SetupScreen.js      Création du code PIN
 src/screens/LockScreen.js       Verrouillage classique + photo discrète
 src/screens/CalculatorScreen.js Verrouillage camouflé en calculatrice

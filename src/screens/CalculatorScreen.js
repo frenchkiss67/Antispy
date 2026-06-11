@@ -3,9 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
-import { verifyPin, getLockUntil, registerAttempt } from '../security';
+import { verifyPin, verifyDuressPin, registerAttempt } from '../security';
+import { wipeVault } from '../vault';
 import { recordAttempt } from '../attempt';
+import useLockCountdown from '../hooks/useLockCountdown';
 import t from '../i18n';
+
+const WIPE_THRESHOLD = 10;
 
 const KEYS = [
   ['C', '⌫', '%', '÷'],
@@ -81,19 +85,15 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
   const [entry, setEntry] = useState('');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
-  const lockUntilRef = useRef(0);
+  // Compte à rebours silencieux : aucun indice visuel, mais le blocage
+  // anti-bruteforce s'applique aussi derrière la calculatrice.
+  const [lockRemaining, setLockRemaining] = useLockCountdown();
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
   }, [permission]);
-
-  useEffect(() => {
-    getLockUntil().then((until) => {
-      lockUntilRef.current = until;
-    });
-  }, []);
 
   // Appui long sur "=" : déverrouillage biométrique discret, sans photo.
   const handleBiometric = async () => {
@@ -107,7 +107,7 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
       disableDeviceFallback: true,
     });
     if (authenticated.success) {
-      onUnlock();
+      onUnlock(false);
     }
   };
 
@@ -118,23 +118,29 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
     const isPinShaped = new RegExp(`^\\d{${pinLength}}$`).test(entry);
     if (isPinShaped) {
       setBusy(true);
-      const success = await verifyPin(entry);
-      const locked = lockUntilRef.current > Date.now();
-      const until = await registerAttempt(success);
-      if (until) {
-        lockUntilRef.current = until;
+      const realPin = await verifyPin(entry);
+      const duress = !realPin && (await verifyDuressPin(entry));
+      const accepted = realPin || duress;
+      const locked = lockRemaining > 0;
+      const { fails, lockSeconds } = await registerAttempt(accepted);
+      if (lockSeconds > 0) {
+        setLockRemaining(lockSeconds);
+      }
+      if (!accepted && settings.wipeEnabled && fails >= WIPE_THRESHOLD) {
+        await wipeVault();
       }
       await recordAttempt({
         cameraRef,
         cameraReady: cameraReady && permission?.granted,
-        success,
+        success: accepted,
+        duress,
         settings,
       });
       setBusy(false);
       // Pendant le blocage anti-bruteforce, même le bon code n'ouvre pas :
       // la calculatrice affiche simplement le nombre, sans rien trahir.
-      if (success && !locked) {
-        onUnlock();
+      if (accepted && !locked) {
+        onUnlock(duress);
         return;
       }
     }

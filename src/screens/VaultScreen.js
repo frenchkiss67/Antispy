@@ -3,7 +3,6 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  Image,
   Modal,
   StyleSheet,
   Text,
@@ -20,9 +19,12 @@ import {
   listVaultPhotos,
   saveNote,
 } from '../vault';
+import DecryptedImage from '../components/DecryptedImage';
 import t from '../i18n';
 
-export default function VaultScreen() {
+// decoy : ouvert avec le code de contrainte, l'écran travaille sur le faux
+// coffre, distinct du vrai et identique en apparence.
+export default function VaultScreen({ decoy }) {
   const [tab, setTab] = useState('notes'); // 'notes' | 'photos'
   const [notes, setNotes] = useState([]);
   const [photos, setPhotos] = useState([]);
@@ -30,16 +32,16 @@ export default function VaultScreen() {
   const [viewing, setViewing] = useState(null); // photo plein écran
 
   useEffect(() => {
-    listNotes().then(setNotes);
-    listVaultPhotos().then(setPhotos);
-  }, []);
+    listNotes(decoy).then(setNotes);
+    listVaultPhotos(decoy).then(setPhotos);
+  }, [decoy]);
 
   const handleSaveNote = async () => {
     if (!editing || editing.text.trim() === '') {
       setEditing(null);
       return;
     }
-    setNotes(await saveNote(editing.text.trim(), editing.id ?? null));
+    setNotes(await saveNote(editing.text.trim(), editing.id ?? null, decoy));
     setEditing(null);
   };
 
@@ -50,7 +52,7 @@ export default function VaultScreen() {
         text: t('delete'),
         style: 'destructive',
         onPress: async () => {
-          setNotes(await deleteNote(id));
+          setNotes(await deleteNote(id, decoy));
           setEditing(null);
         },
       },
@@ -63,7 +65,7 @@ export default function VaultScreen() {
       quality: 0.8,
     });
     if (!result.canceled && result.assets?.[0]?.uri) {
-      setPhotos(await importVaultPhoto(result.assets[0].uri));
+      setPhotos(await importVaultPhoto(result.assets[0].uri, decoy));
     }
   };
 
@@ -74,7 +76,7 @@ export default function VaultScreen() {
         text: t('delete'),
         style: 'destructive',
         onPress: async () => {
-          setPhotos(await deleteVaultPhoto(id));
+          setPhotos(await deleteVaultPhoto(id, decoy));
           setViewing(null);
         },
       },
@@ -149,8 +151,8 @@ export default function VaultScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => setViewing(item)}>
-              <Image
-                source={{ uri: item.uri }}
+              <DecryptedImage
+                file={item.thumbUri ?? item.uri}
                 style={[
                   styles.gridPhoto,
                   { width: photoSize, height: photoSize },
@@ -202,8 +204,8 @@ export default function VaultScreen() {
       <Modal visible={viewing !== null} animationType="fade" transparent>
         {viewing && (
           <View style={styles.viewModal}>
-            <Image
-              source={{ uri: viewing.uri }}
+            <DecryptedImage
+              file={viewing.uri}
               style={styles.fullPhoto}
               resizeMode="contain"
             />

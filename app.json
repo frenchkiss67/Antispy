@@ -53,6 +53,14 @@
         {
           "photosPermission": "Antispy importe des photos de votre galerie vers le coffre-fort privé."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "allowBackup": false
+          }
+        }
       ]
     ]
   }

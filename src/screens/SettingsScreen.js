@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { saveSettings } from '../settings';
+import { isDuressDefined, removeDuressPin } from '../security';
 import { sendIntrusionAlert } from '../webhook';
 import t from '../i18n';
 
@@ -26,12 +27,48 @@ function graceLabel(seconds) {
   return t('graceMinutes', seconds / 60);
 }
 
-export default function SettingsScreen({ settings, onSettingsChange, onChangePin }) {
+export default function SettingsScreen({
+  settings,
+  onSettingsChange,
+  onChangePin,
+  onSetDuress,
+  decoy,
+}) {
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
   const [testing, setTesting] = useState(false);
+  const [duressDefined, setDuressDefined] = useState(false);
+
+  useEffect(() => {
+    if (!decoy) {
+      isDuressDefined().then(setDuressDefined);
+    }
+  }, [decoy]);
 
   const update = async (partial) => {
     onSettingsChange(await saveSettings(partial));
+  };
+
+  const handleWebhookSave = () => {
+    const trimmed = webhookUrl.trim();
+    if (trimmed !== '' && !/^https:\/\//i.test(trimmed)) {
+      Alert.alert(t('webhook'), t('webhookHttpsOnly'));
+      return;
+    }
+    update({ webhookUrl: trimmed });
+  };
+
+  const handleRemoveDuress = () => {
+    Alert.alert(t('duressSection'), t('duressRemoveMessage'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          await removeDuressPin();
+          setDuressDefined(false);
+        },
+      },
+    ]);
   };
 
   const handleLocationToggle = async (enabled) => {
@@ -61,6 +98,41 @@ export default function SettingsScreen({ settings, onSettingsChange, onChangePin
       <TouchableOpacity style={styles.actionButton} onPress={onChangePin}>
         <Text style={styles.actionButtonText}>🔑 {t('changePin')}</Text>
       </TouchableOpacity>
+
+      {!decoy && (
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            {duressDefined ? `✓ ${t('duressDefined')}` : t('duressSection')}
+          </Text>
+          <Text style={styles.help}>{t('duressHelp')}</Text>
+          <View style={styles.chips}>
+            <TouchableOpacity style={styles.chip} onPress={onSetDuress}>
+              <Text style={styles.chipText}>
+                {duressDefined ? t('duressEdit') : t('duressSet')}
+              </Text>
+            </TouchableOpacity>
+            {duressDefined && (
+              <TouchableOpacity
+                style={[styles.chip, styles.chipDanger]}
+                onPress={handleRemoveDuress}
+              >
+                <Text style={styles.chipText}>{t('duressRemove')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>{t('wipeSetting')}</Text>
+          <Switch
+            value={settings.wipeEnabled}
+            onValueChange={(value) => update({ wipeEnabled: value })}
+          />
+        </View>
+        <Text style={styles.help}>{t('wipeHelp')}</Text>
+      </View>
 
       <View style={styles.section}>
         <View style={styles.rowBetween}>
@@ -108,7 +180,7 @@ export default function SettingsScreen({ settings, onSettingsChange, onChangePin
           style={styles.input}
           value={webhookUrl}
           onChangeText={setWebhookUrl}
-          onEndEditing={() => update({ webhookUrl: webhookUrl.trim() })}
+          onEndEditing={handleWebhookSave}
           placeholder={t('webhookPlaceholder')}
           placeholderTextColor="#8b949e"
           autoCapitalize="none"
@@ -201,6 +273,9 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     backgroundColor: '#1f6feb',
+  },
+  chipDanger: {
+    backgroundColor: '#da3633',
   },
   chipText: {
     color: '#e6edf3',

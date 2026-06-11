@@ -4,7 +4,8 @@
 // jamais bloquer ni révéler la surveillance.
 
 export async function sendIntrusionAlert(webhookUrl, payload) {
-  if (!webhookUrl) {
+  // HTTPS obligatoire : la photo et la position ne partent jamais en clair.
+  if (!webhookUrl || !/^https:\/\//i.test(webhookUrl)) {
     return false;
   }
   try {

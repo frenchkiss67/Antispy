@@ -3,7 +3,6 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,8 +11,11 @@ import {
   View,
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { deleteAllCaptures, deleteCapture, listCaptures } from '../captures';
 import { loadSettings, saveSettings } from '../settings';
+import { loadImageUri } from '../cryptoStore';
+import DecryptedImage from '../components/DecryptedImage';
 import t from '../i18n';
 
 function formatDate(iso) {
@@ -27,19 +29,24 @@ function formatDate(iso) {
   });
 }
 
-export default function JournalScreen() {
+export default function JournalScreen({ decoy }) {
   const [captures, setCaptures] = useState([]);
   const [lastSeen, setLastSeen] = useState(null);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
+    // En mode contrainte (faux coffre), le journal reste vide : il ne doit
+    // rien révéler de la surveillance.
+    if (decoy) {
+      return;
+    }
     (async () => {
       const settings = await loadSettings();
       setLastSeen(settings.lastSeen);
       setCaptures(await listCaptures());
       await saveSettings({ lastSeen: new Date().toISOString() });
     })();
-  }, []);
+  }, [decoy]);
 
   const isNew = (capture) => lastSeen && capture.date > lastSeen;
   const newCaptures = captures.filter(isNew);
@@ -70,9 +77,28 @@ export default function JournalScreen() {
     ]);
   };
 
-  const handleShare = async (uri) => {
-    if (await Sharing.isAvailableAsync()) {
+  // Les fichiers stockés sont chiffrés : pour partager, on déchiffre vers
+  // un fichier temporaire du cache, supprimé juste après l'envoi.
+  const handleShare = async (file) => {
+    if (!(await Sharing.isAvailableAsync())) {
+      return;
+    }
+    const uri = await loadImageUri(file);
+    if (!uri) {
+      return;
+    }
+    if (!uri.startsWith('data:')) {
       await Sharing.shareAsync(uri);
+      return;
+    }
+    const temp = `${FileSystem.cacheDirectory}share-${Date.now()}.jpg`;
+    await FileSystem.writeAsStringAsync(temp, uri.split(',')[1], {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    try {
+      await Sharing.shareAsync(temp);
+    } finally {
+      await FileSystem.deleteAsync(temp, { idempotent: true });
     }
   };
 
@@ -102,16 +128,27 @@ export default function JournalScreen() {
               style={[styles.card, isNew(item) && styles.cardNew]}
               onPress={() => setSelected(item)}
             >
-              <Image source={{ uri: item.uris[0] }} style={styles.photo} />
+              <DecryptedImage
+                file={item.thumbUri ?? item.uris[0]}
+                style={styles.photo}
+              />
               <View style={styles.cardInfo}>
                 <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
                 <Text
                   style={[
                     styles.badge,
-                    item.success ? styles.badgeOk : styles.badgeKo,
+                    item.duress
+                      ? styles.badgeDuress
+                      : item.success
+                        ? styles.badgeOk
+                        : styles.badgeKo,
                   ]}
                 >
-                  {item.success ? t('codeOk') : t('codeKo')}
+                  {item.duress
+                    ? t('codeDuress')
+                    : item.success
+                      ? t('codeOk')
+                      : t('codeKo')}
                 </Text>
                 <Text style={styles.cardMeta}>
                   {t('photoCount', item.uris.length)}
@@ -144,9 +181,9 @@ export default function JournalScreen() {
               showsHorizontalScrollIndicator={false}
             >
               {selected.uris.map((uri) => (
-                <Image
+                <DecryptedImage
                   key={uri}
-                  source={{ uri }}
+                  file={uri}
                   style={{ width: screenWidth, height: screenHeight }}
                   resizeMode="contain"
                 />
@@ -157,10 +194,18 @@ export default function JournalScreen() {
               <Text
                 style={[
                   styles.badge,
-                  selected.success ? styles.badgeOk : styles.badgeKo,
+                  selected.duress
+                    ? styles.badgeDuress
+                    : selected.success
+                      ? styles.badgeOk
+                      : styles.badgeKo,
                 ]}
               >
-                {selected.success ? t('codeOk') : t('codeKo')}
+                {selected.duress
+                  ? t('codeDuress')
+                  : selected.success
+                    ? t('codeOk')
+                    : t('codeKo')}
               </Text>
             </View>
             <View style={styles.modalActions}>
@@ -269,6 +314,9 @@ const styles = StyleSheet.create({
   },
   badgeKo: {
     color: '#f85149',
+  },
+  badgeDuress: {
+    color: '#d29922',
   },
   cardMeta: {
     color: '#8b949e',

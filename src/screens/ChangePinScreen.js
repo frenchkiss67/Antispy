@@ -1,52 +1,87 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PinPad, { PinDots } from '../components/PinPad';
-import { savePin, verifyPin } from '../security';
+import {
+  savePin,
+  saveDuressPin,
+  verifyPin,
+  verifyDuressPin,
+} from '../security';
 import t from '../i18n';
 
 const PIN_LENGTH = 4;
 
-export default function ChangePinScreen({ pinLength, onDone, onCancel }) {
-  const [step, setStep] = useState('current'); // 'current' | 'new' | 'confirm'
+// mode 'pin'    : changer le code principal (vérifie l'ancien d'abord).
+// mode 'duress' : définir/changer le code de contrainte (depuis les
+//                 réglages, donc déjà authentifié : pas d'étape "ancien").
+// decoy         : session ouverte au code de contrainte ; "changer le PIN"
+//                 modifie alors le code de contrainte, jamais le vrai.
+export default function ChangePinScreen({
+  pinLength,
+  mode = 'pin',
+  decoy = false,
+  onDone,
+  onCancel,
+}) {
+  const [step, setStep] = useState(mode === 'duress' ? 'new' : 'current');
   const [pin, setPin] = useState('');
   const [newPin, setNewPin] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
 
+  const duressTarget = mode === 'duress' || decoy;
   const stepLength = step === 'current' ? pinLength : PIN_LENGTH;
   const titles = {
     current: t('currentPin'),
-    new: t('newPin'),
-    confirm: t('confirmNewPin'),
+    new: mode === 'duress' ? t('newDuressPin') : t('newPin'),
+    confirm: mode === 'duress' ? t('confirmDuressPin') : t('confirmNewPin'),
   };
 
   const handleDigit = async (digit) => {
     if (pin.length >= stepLength) {
       return;
     }
-    setError(false);
+    setError('');
     const next = pin + digit;
     setPin(next);
     if (next.length < stepLength) {
       return;
     }
     if (step === 'current') {
-      if (await verifyPin(next)) {
+      const valid = decoy ? await verifyDuressPin(next) : await verifyPin(next);
+      if (valid) {
         setPin('');
         setStep('new');
       } else {
-        setError(true);
+        setError(t('wrongPin'));
         setPin('');
       }
-    } else if (step === 'new') {
+      return;
+    }
+    if (step === 'new') {
+      // Le code principal et le code de contrainte doivent rester distincts.
+      const collision = duressTarget
+        ? await verifyPin(next)
+        : await verifyDuressPin(next);
+      if (collision) {
+        setError(t('duressSameAsPin'));
+        setPin('');
+        return;
+      }
       setNewPin(next);
       setPin('');
       setStep('confirm');
-    } else if (next === newPin) {
-      await savePin(next);
+      return;
+    }
+    if (next === newPin) {
+      if (duressTarget) {
+        await saveDuressPin(next);
+      } else {
+        await savePin(next);
+      }
       Alert.alert(t('appName'), t('pinChanged'));
       onDone();
     } else {
-      setError(true);
+      setError(t('pinMismatch'));
       setPin('');
       setNewPin('');
       setStep('new');
@@ -55,14 +90,12 @@ export default function ChangePinScreen({ pinLength, onDone, onCancel }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🔑 {t('changePin')}</Text>
+      <Text style={styles.title}>
+        🔑 {mode === 'duress' ? t('duressSection') : t('changePin')}
+      </Text>
       <Text style={styles.subtitle}>{titles[step]}</Text>
-      {error && (
-        <Text style={styles.error}>
-          {step === 'current' ? t('wrongPin') : t('pinMismatch')}
-        </Text>
-      )}
-      <PinDots length={stepLength} filled={pin.length} error={error} />
+      {error !== '' && <Text style={styles.error}>{error}</Text>}
+      <PinDots length={stepLength} filled={pin.length} error={error !== ''} />
       <PinPad onDigit={handleDigit} onDelete={() => setPin(pin.slice(0, -1))} />
       <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
         <Text style={styles.cancelButtonText}>{t('cancel')}</Text>

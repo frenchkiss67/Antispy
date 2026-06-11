@@ -70,6 +70,22 @@ const fr = {
   webhookTest: "Tester l'envoi",
   webhookTestOk: 'Envoi réussi.',
   webhookTestKo: "Échec de l'envoi.",
+  webhookHttpsOnly: "Seules les URL https:// sont acceptées : la photo et la position ne doivent jamais circuler en clair.",
+  duressSection: 'Code de contrainte',
+  duressHelp:
+    "Un second code PIN qui ouvre un faux coffre, vide au départ. Si quelqu'un vous force à ouvrir l'application, donnez ce code : vos vraies données restent invisibles et la photo est quand même prise.",
+  duressSet: 'Définir un code de contrainte',
+  duressEdit: 'Modifier',
+  duressRemove: 'Supprimer',
+  duressRemoveMessage: 'Supprimer le code de contrainte ?',
+  duressDefined: 'Code de contrainte actif',
+  newDuressPin: 'Nouveau code de contrainte',
+  confirmDuressPin: 'Confirmez le code de contrainte',
+  duressSameAsPin: 'Ce code est déjà utilisé, choisissez-en un autre.',
+  codeDuress: '⚠ Code de contrainte',
+  wipeSetting: 'Effacer le coffre après 10 codes erronés',
+  wipeHelp:
+    "Au 10e code PIN erroné consécutif, les notes et photos du vrai coffre sont définitivement supprimées. Le journal des photos de surveillance est conservé.",
   about: 'Photo uniquement à la saisie du code PIN. Le déverrouillage par empreinte ou visage ne prend jamais de photo.',
 };
 
@@ -143,6 +159,23 @@ const en = {
   webhookTest: 'Test delivery',
   webhookTestOk: 'Delivery succeeded.',
   webhookTestKo: 'Delivery failed.',
+  webhookHttpsOnly:
+    'Only https:// URLs are accepted: the photo and location must never travel unencrypted.',
+  duressSection: 'Duress code',
+  duressHelp:
+    'A second PIN that opens a decoy vault, empty at first. If someone forces you to open the app, give this code: your real data stays hidden and the photo is still taken.',
+  duressSet: 'Set a duress code',
+  duressEdit: 'Change',
+  duressRemove: 'Remove',
+  duressRemoveMessage: 'Remove the duress code?',
+  duressDefined: 'Duress code active',
+  newDuressPin: 'New duress code',
+  confirmDuressPin: 'Confirm the duress code',
+  duressSameAsPin: 'This code is already in use, choose another one.',
+  codeDuress: '⚠ Duress code',
+  wipeSetting: 'Wipe the vault after 10 wrong codes',
+  wipeHelp:
+    'On the 10th consecutive wrong PIN, the notes and photos in the real vault are permanently deleted. The surveillance photo journal is kept.',
   about:
     'Photos are taken only when the PIN is typed. Fingerprint or face unlock never takes a photo.',
 };
