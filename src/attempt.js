@@ -60,7 +60,14 @@ export async function getAttemptLocation(enabled) {
 
 // Enregistre une saisie de code PIN : 1 photo si le code est accepté
 // (correct ou contrainte), rafale de 3 s'il est erroné, plus position GPS
-// et alerte webhook sur échec.
+// et alerte webhook sur échec. Une entrée de journal est créée même si
+// aucune photo n'a pu être prise (caméra non prête, permission refusée).
+//
+// La capture est attendue (la caméra doit être encore montée), mais la
+// persistance — localisation GPS (jusqu'à plusieurs secondes), écriture
+// chiffrée, webhook — s'exécute en arrière-plan pour ne pas retarder le
+// déverrouillage d'un code correct. Renvoie la promesse de persistance
+// pour les tests ou un éventuel await volontaire.
 export async function recordAttempt({
   cameraRef,
   cameraReady,
@@ -72,21 +79,20 @@ export async function recordAttempt({
   if (cameraRef.current && cameraReady) {
     photos = await captureBurst(cameraRef, success ? 1 : 3);
   }
-  const location = await getAttemptLocation(settings.locationEnabled);
-  if (photos.length > 0) {
+  return (async () => {
+    const location = await getAttemptLocation(settings.locationEnabled);
     try {
       await saveCapture({ photos, success, duress, location });
     } catch (e) {
-      // L'enregistrement ne doit jamais bloquer la saisie.
+      // L'enregistrement ne doit jamais bloquer ni faire échouer la saisie.
     }
-  }
-  if (!success && settings.webhookUrl) {
-    // Volontairement non attendu : l'envoi réseau ne doit pas ralentir l'écran.
-    sendIntrusionAlert(settings.webhookUrl, {
-      date: new Date().toISOString(),
-      success,
-      location,
-      photoBase64: photos[0]?.base64 ?? null,
-    });
-  }
+    if (!success && settings.webhookUrl) {
+      sendIntrusionAlert(settings.webhookUrl, {
+        date: new Date().toISOString(),
+        success,
+        location,
+        photoBase64: photos[0]?.base64 ?? null,
+      });
+    }
+  })();
 }

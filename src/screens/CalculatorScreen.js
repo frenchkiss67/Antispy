@@ -3,13 +3,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
-import { verifyPin, verifyDuressPin, registerAttempt } from '../security';
-import { wipeVault } from '../vault';
+import { verifyPin, verifyDuressPin, resetAttempts } from '../security';
 import { recordAttempt } from '../attempt';
+import { evaluate } from '../calculator';
 import useLockCountdown from '../hooks/useLockCountdown';
 import t from '../i18n';
-
-const WIPE_THRESHOLD = 10;
 
 const KEYS = [
   ['C', '⌫', '%', '÷'],
@@ -18,65 +16,6 @@ const KEYS = [
   ['1', '2', '3', '+'],
   ['0', '.', '=', ''],
 ];
-
-// Évalue une expression arithmétique simple sans eval() :
-// uniquement chiffres, point et opérateurs de base.
-function evaluate(expression) {
-  const sanitized = expression
-    .replace(/×/g, '*')
-    .replace(/÷/g, '/')
-    .replace(/−/g, '-')
-    .replace(/%/g, '/100');
-  if (!/^[0-9+\-*/. ()]+$/.test(sanitized)) {
-    return null;
-  }
-  try {
-    const tokens = sanitized.match(/(\d+\.?\d*|[+\-*/()])/g);
-    if (!tokens) {
-      return null;
-    }
-    let position = 0;
-    const peek = () => tokens[position];
-    const next = () => tokens[position++];
-    const parsePrimary = () => {
-      if (peek() === '(') {
-        next();
-        const value = parseAddition();
-        if (peek() === ')') {
-          next();
-        }
-        return value;
-      }
-      if (peek() === '-') {
-        next();
-        return -parsePrimary();
-      }
-      return parseFloat(next());
-    };
-    const parseMultiplication = () => {
-      let value = parsePrimary();
-      while (peek() === '*' || peek() === '/') {
-        const op = next();
-        const right = parsePrimary();
-        value = op === '*' ? value * right : value / right;
-      }
-      return value;
-    };
-    const parseAddition = () => {
-      let value = parseMultiplication();
-      while (peek() === '+' || peek() === '-') {
-        const op = next();
-        const right = parseMultiplication();
-        value = op === '+' ? value + right : value - right;
-      }
-      return value;
-    };
-    const result = parseAddition();
-    return Number.isFinite(result) ? result : null;
-  } catch (e) {
-    return null;
-  }
-}
 
 export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
   const cameraRef = useRef(null);
@@ -107,6 +46,7 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
       disableDeviceFallback: true,
     });
     if (authenticated.success) {
+      await resetAttempts();
       onUnlock(false);
     }
   };
@@ -115,34 +55,37 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
     if (busy || entry === '') {
       return;
     }
+    // En camouflage, seul le code correct ou le code de contrainte agit : un
+    // nombre quelconque tapé sur la calculatrice reste un simple calcul, sans
+    // photo ni comptage d'échec. C'est indispensable ici — sinon un usage
+    // normal (« 2024 = ») serait pris pour une intrusion et pourrait, cumulé,
+    // déclencher l'effacement d'urgence. Un attaquant ignore d'ailleurs qu'il
+    // s'agit d'un verrou : la force brute n'est pas la menace en camouflage.
     const isPinShaped = new RegExp(`^\\d{${pinLength}}$`).test(entry);
     if (isPinShaped) {
       setBusy(true);
       const realPin = await verifyPin(entry);
       const duress = !realPin && (await verifyDuressPin(entry));
       const accepted = realPin || duress;
-      const locked = lockRemaining > 0;
-      const { fails, lockSeconds } = await registerAttempt(accepted);
-      if (lockSeconds > 0) {
-        setLockRemaining(lockSeconds);
-      }
-      if (!accepted && settings.wipeEnabled && fails >= WIPE_THRESHOLD) {
-        await wipeVault();
-      }
-      await recordAttempt({
-        cameraRef,
-        cameraReady: cameraReady && permission?.granted,
-        success: accepted,
-        duress,
-        settings,
-      });
-      setBusy(false);
-      // Pendant le blocage anti-bruteforce, même le bon code n'ouvre pas :
-      // la calculatrice affiche simplement le nombre, sans rien trahir.
-      if (accepted && !locked) {
+      // Un blocage anti-bruteforce éventuel (hérité d'un usage non camouflé)
+      // n'ouvre pas : on affiche seulement le résultat, sans rien trahir.
+      if (accepted && lockRemaining === 0) {
+        await resetAttempts();
+        // La photo doit être prise pendant que la caméra est encore montée,
+        // donc avant onUnlock (qui démonte cet écran) ; la persistance, elle,
+        // continue en arrière-plan.
+        await recordAttempt({
+          cameraRef,
+          cameraReady: cameraReady && permission?.granted,
+          success: true,
+          duress,
+          settings,
+        });
+        setBusy(false);
         onUnlock(duress);
         return;
       }
+      setBusy(false);
     }
     const value = evaluate(entry);
     setResult(value === null ? 'Error' : String(value));

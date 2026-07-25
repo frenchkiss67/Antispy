@@ -123,27 +123,34 @@ export default function SettingsScreen({
         </View>
       )}
 
-      <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>{t('wipeSetting')}</Text>
-          <Switch
-            value={settings.wipeEnabled}
-            onValueChange={(value) => update({ wipeEnabled: value })}
-          />
+      {/* Sections sensibles masquées en mode leurre : leur seule présence
+          (effacement, camouflage, surveillance, webhook) révélerait qu'il
+          ne s'agit pas d'une simple application de coffre. */}
+      {!decoy && (
+        <View style={styles.section}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>{t('wipeSetting')}</Text>
+            <Switch
+              value={settings.wipeEnabled}
+              onValueChange={(value) => update({ wipeEnabled: value })}
+            />
+          </View>
+          <Text style={styles.help}>{t('wipeHelp')}</Text>
         </View>
-        <Text style={styles.help}>{t('wipeHelp')}</Text>
-      </View>
+      )}
 
-      <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>{t('camouflage')}</Text>
-          <Switch
-            value={settings.camouflage}
-            onValueChange={(value) => update({ camouflage: value })}
-          />
+      {!decoy && (
+        <View style={styles.section}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>{t('camouflage')}</Text>
+            <Switch
+              value={settings.camouflage}
+              onValueChange={(value) => update({ camouflage: value })}
+            />
+          </View>
+          <Text style={styles.help}>{t('camouflageHelp')}</Text>
         </View>
-        <Text style={styles.help}>{t('camouflageHelp')}</Text>
-      </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.label}>{t('graceDelay')}</Text>
@@ -163,45 +170,49 @@ export default function SettingsScreen({
         </View>
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>{t('locationSetting')}</Text>
-          <Switch
-            value={settings.locationEnabled}
-            onValueChange={handleLocationToggle}
-          />
+      {!decoy && (
+        <View style={styles.section}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>{t('locationSetting')}</Text>
+            <Switch
+              value={settings.locationEnabled}
+              onValueChange={handleLocationToggle}
+            />
+          </View>
+          <Text style={styles.help}>{t('locationHelp')}</Text>
         </View>
-        <Text style={styles.help}>{t('locationHelp')}</Text>
-      </View>
+      )}
 
-      <View style={styles.section}>
-        <Text style={styles.label}>{t('webhook')}</Text>
-        <TextInput
-          style={styles.input}
-          value={webhookUrl}
-          onChangeText={setWebhookUrl}
-          onEndEditing={handleWebhookSave}
-          placeholder={t('webhookPlaceholder')}
-          placeholderTextColor="#8b949e"
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
-        <Text style={styles.help}>{t('webhookHelp')}</Text>
-        {webhookUrl.trim() !== '' && (
-          <TouchableOpacity
-            style={styles.testButton}
-            onPress={handleWebhookTest}
-            disabled={testing}
-          >
-            <Text style={styles.testButtonText}>
-              {testing ? '…' : t('webhookTest')}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {!decoy && (
+        <View style={styles.section}>
+          <Text style={styles.label}>{t('webhook')}</Text>
+          <TextInput
+            style={styles.input}
+            value={webhookUrl}
+            onChangeText={setWebhookUrl}
+            onEndEditing={handleWebhookSave}
+            placeholder={t('webhookPlaceholder')}
+            placeholderTextColor="#8b949e"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          <Text style={styles.help}>{t('webhookHelp')}</Text>
+          {webhookUrl.trim() !== '' && (
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={handleWebhookTest}
+              disabled={testing}
+            >
+              <Text style={styles.testButtonText}>
+                {testing ? '…' : t('webhookTest')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
-      <Text style={styles.about}>{t('about')}</Text>
+      {!decoy && <Text style={styles.about}>{t('about')}</Text>}
     </ScrollView>
   );
 }

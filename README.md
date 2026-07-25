@@ -47,7 +47,12 @@ seule la saisie du code PIN prend une photo.
   et réglages sont chiffrés en AES-256-CTR avec une clé aléatoire de
   32 octets conservée dans le Keychain iOS / Keystore Android. Les images
   sont déchiffrées en mémoire uniquement, jamais écrites en clair sur le
-  disque (sauf fichier temporaire le temps d'un partage explicite).
+  disque (sauf fichier temporaire le temps d'un partage explicite), et le
+  cache mémoire est vidé à chaque verrouillage.
+- **Code PIN étiré (KDF)** : le PIN n'est pas simplement haché mais passé
+  dans 50 000 itérations de SHA-256 avec sel, ce qui rend un cassage hors
+  ligne (sur appareil compromis) nettement plus coûteux. Les anciens
+  hachages sont migrés automatiquement à la première saisie réussie.
 - **Code de contrainte (duress)** : un second PIN, configurable dans les
   réglages, ouvre un **faux coffre** vide au départ. Le journal y est
   vide, la section code de contrainte invisible, et « changer le PIN »
@@ -64,9 +69,31 @@ seule la saisie du code PIN prend une photo.
   `http://`.
 - **Sauvegardes Android désactivées** (`allowBackup=false`) : les données
   chiffrées ne partent pas dans les sauvegardes cloud.
+- **Mode leurre cloisonné** : ouvert avec le code de contrainte, l'écran
+  Réglages masque tout ce qui trahirait une application anti-espion
+  (effacement, camouflage, surveillance webhook, localisation) ; seul le
+  changement de code reste visible et ne modifie que le code de contrainte.
+- **En camouflage, seul un code valide agit** : un calcul quelconque reste
+  un simple calcul (aucune photo, aucun comptage d'échec), pour éviter les
+  fausses intrusions et tout effacement accidentel.
 - Limite à connaître : un code PIN à 4 chiffres reste un secret faible ;
-  la protection réelle des données repose sur la clé AES du
-  Keystore/Keychain et sur le verrouillage du téléphone lui-même.
+  la protection réelle des données repose sur l'étirement du PIN, la clé
+  AES du Keystore/Keychain et sur le verrouillage du téléphone lui-même.
+
+## Tests
+
+Logique de sécurité couverte par des tests unitaires (Jest) :
+
+```bash
+npm test
+```
+
+Couvre l'encodage base64/UTF-8, l'implémentation SHA-256 (vecteurs
+officiels + comparaison avec Node), le chiffrement au repos (le contenu
+écrit est bien chiffré et relu à l'identique, IV distincts), l'étirement
+et la migration des codes PIN, l'anti-bruteforce, et l'évaluateur de la
+calculatrice camouflée. Exécuté en CI via GitHub Actions
+(`.github/workflows/ci.yml`).
 
 ## Lancer l'application
 
@@ -109,8 +136,10 @@ sujet : vous recevrez une notification à chaque code erroné.
 ```
 App.js                          Navigation, onglets, reverrouillage, voile de confidentialité
 src/i18n.js                     Traductions français / anglais
-src/security.js                 Hachage des PIN (principal + contrainte), anti-bruteforce
+src/security.js                 PIN étirés (KDF), code de contrainte, anti-bruteforce
+src/sha256.js                   SHA-256 pur JavaScript (étirement de clé)
 src/cryptoStore.js              Chiffrement au repos (AES-256-CTR, clé en Keystore/Keychain)
+src/calculator.js               Évaluateur d'expressions de l'écran camouflé
 src/base64.js                   Encodage base64 / UTF-8 pur JavaScript
 src/settings.js                 Réglages persistants chiffrés
 src/captures.js                 Stockage chiffré des photos de surveillance

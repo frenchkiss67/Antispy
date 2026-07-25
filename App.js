@@ -17,6 +17,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePinScreen from './src/screens/ChangePinScreen';
 import { getPinLength, isPinDefined } from './src/security';
 import { DEFAULT_SETTINGS, loadSettings } from './src/settings';
+import { clearImageCache } from './src/cryptoStore';
 import t from './src/i18n';
 
 export default function App() {
@@ -74,6 +75,9 @@ export default function App() {
   }, []);
 
   const lock = async () => {
+    // Vide les images déchiffrées en mémoire : elles ne doivent pas survivre
+    // au verrouillage (notamment avant une éventuelle session leurre).
+    clearImageCache();
     // Recharge les réglages : lastSeen et options ont pu changer.
     setSettings(await loadSettings());
     setDecoy(false);

@@ -4,6 +4,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Tests
+coverage/
+
 # Builds natifs
 ios/
 android/

@@ -1,5 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { sha256Bytes, bytesToHex } from './sha256';
+import { utf8ToBytes } from './base64';
 
 const KEY_HASH = 'antispy_pin_hash';
 const KEY_SALT = 'antispy_pin_salt';
@@ -7,33 +9,67 @@ const KEY_LENGTH = 'antispy_pin_length';
 const KEY_DURESS_HASH = 'antispy_duress_hash';
 const KEY_DURESS_SALT = 'antispy_duress_salt';
 
-function bytesToHex(bytes) {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+// Étirement de clé : un PIN court est un secret faible. On enchaîne un
+// grand nombre de SHA-256 pour rendre chaque essai coûteux hors ligne (si
+// le SecureStore est extrait d'un appareil compromis). Les hachages sont
+// versionnés « v2:itérations:hex » ; les anciens (un seul SHA-256, sans
+// préfixe) restent vérifiables et sont migrés de façon transparente.
+const KDF_ITERATIONS = 50000;
+
+function hexBytes(bytes) {
+  return bytesToHex(bytes);
 }
 
-async function hashPin(pin, salt) {
+function stretch(pin, salt, iterations) {
+  let data = utf8ToBytes(`${salt}:${pin}`);
+  for (let i = 0; i < iterations; i++) {
+    data = sha256Bytes(data);
+  }
+  return hexBytes(data);
+}
+
+function formatV2(iterations, hex) {
+  return `v2:${iterations}:${hex}`;
+}
+
+async function legacyHash(pin, salt) {
   return Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     `${salt}:${pin}`
   );
 }
 
+async function randomSaltHex() {
+  const bytes = await Crypto.getRandomBytesAsync(16);
+  return hexBytes(bytes);
+}
+
 async function saveHashed(pin, hashKey, saltKey) {
-  const salt = bytesToHex(await Crypto.getRandomBytesAsync(16));
-  const hash = await hashPin(pin, salt);
+  const salt = await randomSaltHex();
+  const hash = formatV2(KDF_ITERATIONS, stretch(pin, salt, KDF_ITERATIONS));
   await SecureStore.setItemAsync(saltKey, salt);
   await SecureStore.setItemAsync(hashKey, hash);
 }
 
 async function verifyHashed(pin, hashKey, saltKey) {
   const salt = await SecureStore.getItemAsync(saltKey);
-  const expected = await SecureStore.getItemAsync(hashKey);
-  if (!salt || !expected) {
+  const stored = await SecureStore.getItemAsync(hashKey);
+  if (!salt || !stored) {
     return false;
   }
-  return (await hashPin(pin, salt)) === expected;
+  if (stored.startsWith('v2:')) {
+    const [, iterStr, expected] = stored.split(':');
+    const iterations = parseInt(iterStr, 10) || KDF_ITERATIONS;
+    return stretch(pin, salt, iterations) === expected;
+  }
+  // Format hérité (un seul SHA-256). Vérifie, puis migre vers v2.
+  const legacy = await legacyHash(pin, salt);
+  if (legacy !== stored) {
+    return false;
+  }
+  const upgraded = formatV2(KDF_ITERATIONS, stretch(pin, salt, KDF_ITERATIONS));
+  await SecureStore.setItemAsync(hashKey, upgraded);
+  return true;
 }
 
 export async function isPinDefined() {
@@ -65,6 +101,9 @@ export async function saveDuressPin(pin) {
 }
 
 export async function verifyDuressPin(pin) {
+  if ((await SecureStore.getItemAsync(KEY_DURESS_HASH)) == null) {
+    return false;
+  }
   return verifyHashed(pin, KEY_DURESS_HASH, KEY_DURESS_SALT);
 }
 
@@ -98,10 +137,16 @@ export async function setLockRemaining(seconds) {
   }
 }
 
+// Remet à zéro le compteur d'échecs et tout blocage en cours. Appelé sur
+// un déverrouillage réussi, quel qu'en soit le moyen (PIN ou biométrie).
+export async function resetAttempts() {
+  await SecureStore.deleteItemAsync(KEY_FAILS);
+  await SecureStore.deleteItemAsync(KEY_LOCK_REMAINING);
+}
+
 export async function registerAttempt(success) {
   if (success) {
-    await SecureStore.deleteItemAsync(KEY_FAILS);
-    await SecureStore.deleteItemAsync(KEY_LOCK_REMAINING);
+    await resetAttempts();
     return { fails: 0, lockSeconds: 0 };
   }
   const stored = await SecureStore.getItemAsync(KEY_FAILS);

@@ -32,6 +32,12 @@ async function ensureDir(decoy) {
   }
 }
 
+let sequence = 0;
+function nextId() {
+  sequence = (sequence + 1) % 100000;
+  return `${Date.now()}-${sequence}`;
+}
+
 async function readJson(file) {
   try {
     const content = await readEncryptedText(file);
@@ -59,7 +65,7 @@ export async function saveNote(text, id, decoy) {
     );
   } else {
     next = [
-      { id: `${Date.now()}`, text, date: new Date().toISOString() },
+      { id: nextId(), text, date: new Date().toISOString() },
       ...notes,
     ];
   }
@@ -81,7 +87,7 @@ export async function listVaultPhotos(decoy) {
 export async function importVaultPhoto(sourceUri, decoy) {
   await ensureDir(decoy);
   const { dir, photos: photosFile } = paths(decoy);
-  const id = `${Date.now()}`;
+  const id = nextId();
   // Redimensionne avant chiffrement : limite la taille des fichiers et le
   // temps de déchiffrement à l'affichage.
   const main = await ImageManipulator.manipulateAsync(

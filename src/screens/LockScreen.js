@@ -3,7 +3,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import PinPad, { PinDots } from '../components/PinPad';
-import { verifyPin, verifyDuressPin, registerAttempt } from '../security';
+import {
+  verifyPin,
+  verifyDuressPin,
+  registerAttempt,
+  resetAttempts,
+} from '../security';
 import { wipeVault } from '../vault';
 import { recordAttempt } from '../attempt';
 import useLockCountdown from '../hooks/useLockCountdown';
@@ -38,6 +43,11 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
       disableDeviceFallback: true,
     });
     if (result.success) {
+      // Un déverrouillage biométrique réussi vaut succès : on efface le
+      // compteur d'échecs, sinon ils s'accumuleraient jusqu'à un éventuel
+      // effacement d'urgence sans qu'aucune attaque n'ait eu lieu.
+      await resetAttempts();
+      setLockRemaining(0);
       onUnlock(false);
     }
   };
