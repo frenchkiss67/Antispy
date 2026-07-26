@@ -4,6 +4,10 @@ const fr = {
   appName: 'Antispy',
   choosePin: 'Choisissez votre code PIN',
   confirmPin: 'Confirmez votre code PIN',
+  choosePinLength: 'Longueur du code',
+  digits: (n) => `${n} chiffres`,
+  duressRemovedByLength:
+    'La longueur du code a changé : le code de contrainte a été supprimé, redéfinissez-le si besoin.',
   pinMismatch: 'Les codes ne correspondent pas, recommencez.',
   enterPin: 'Saisissez votre code PIN',
   wrongPin: 'Code PIN incorrect',
@@ -93,6 +97,10 @@ const en = {
   appName: 'Antispy',
   choosePin: 'Choose your PIN code',
   confirmPin: 'Confirm your PIN code',
+  choosePinLength: 'Code length',
+  digits: (n) => `${n} digits`,
+  duressRemovedByLength:
+    'The code length changed: the duress code was removed, set it again if needed.',
   pinMismatch: 'The codes do not match, try again.',
   enterPin: 'Enter your PIN code',
   wrongPin: 'Wrong PIN code',

@@ -8,7 +8,8 @@ seule la saisie du code PIN prend une photo.
 
 ## Fonctionnalités
 
-- **Code PIN à 4 chiffres** choisi au premier lancement, stocké haché
+- **Code PIN à 4 ou 6 chiffres** (au choix au premier lancement, modifiable
+  ensuite dans les réglages), stocké haché
   (SHA-256 + sel) dans le stockage sécurisé du téléphone
   (Keychain iOS / Keystore Android), modifiable dans les réglages.
 - **Photo discrète à chaque saisie du PIN** : 1 photo si le code est
@@ -76,7 +77,8 @@ seule la saisie du code PIN prend une photo.
 - **En camouflage, seul un code valide agit** : un calcul quelconque reste
   un simple calcul (aucune photo, aucun comptage d'échec), pour éviter les
   fausses intrusions et tout effacement accidentel.
-- Limite à connaître : un code PIN à 4 chiffres reste un secret faible ;
+- Limite à connaître : un code PIN à 4 chiffres reste un secret faible (un
+  code à 6 chiffres élargit l'espace de recherche de 100 fois) ;
   la protection réelle des données repose sur l'étirement du PIN, la clé
   AES du Keystore/Keychain et sur le verrouillage du téléphone lui-même.
 

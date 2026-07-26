@@ -6,15 +6,16 @@ import {
   saveDuressPin,
   verifyPin,
   verifyDuressPin,
+  isDuressDefined,
+  removeDuressPin,
 } from '../security';
 import t from '../i18n';
 
-const PIN_LENGTH = 4;
+const LENGTHS = [4, 6];
 
 // mode 'pin'    : changer le code principal (vérifie l'ancien d'abord).
-// mode 'duress' : définir/changer le code de contrainte (depuis les
-//                 réglages, donc déjà authentifié : pas d'étape "ancien").
-// decoy         : session ouverte au code de contrainte ; "changer le PIN"
+// mode 'duress' : définir/changer le code de contrainte (déjà authentifié).
+// decoy         : session ouverte au code de contrainte ; « changer le PIN »
 //                 modifie alors le code de contrainte, jamais le vrai.
 export default function ChangePinScreen({
   pinLength,
@@ -27,9 +28,16 @@ export default function ChangePinScreen({
   const [pin, setPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
+  const [chosenLength, setChosenLength] = useState(pinLength);
 
   const duressTarget = mode === 'duress' || decoy;
-  const stepLength = step === 'current' ? pinLength : PIN_LENGTH;
+  // Le code de contrainte doit avoir la même longueur que le code principal
+  // (l'écran de verrouillage valide à cette longueur). Seul le changement du
+  // code principal permet donc de choisir une nouvelle longueur.
+  const newLength = duressTarget ? pinLength : chosenLength;
+  const stepLength = step === 'current' ? pinLength : newLength;
+  const canChooseLength = step === 'new' && !duressTarget && pin === '';
+
   const titles = {
     current: t('currentPin'),
     new: mode === 'duress' ? t('newDuressPin') : t('newPin'),
@@ -75,10 +83,18 @@ export default function ChangePinScreen({
     if (next === newPin) {
       if (duressTarget) {
         await saveDuressPin(next);
+        Alert.alert(t('appName'), t('pinChanged'));
       } else {
         await savePin(next);
+        // Un code de contrainte défini à l'ancienne longueur ne serait plus
+        // saisissable : on le supprime et on invite à le redéfinir.
+        if (next.length !== pinLength && (await isDuressDefined())) {
+          await removeDuressPin();
+          Alert.alert(t('appName'), t('duressRemovedByLength'));
+        } else {
+          Alert.alert(t('appName'), t('pinChanged'));
+        }
       }
-      Alert.alert(t('appName'), t('pinChanged'));
       onDone();
     } else {
       setError(t('pinMismatch'));
@@ -94,6 +110,19 @@ export default function ChangePinScreen({
         🔑 {mode === 'duress' ? t('duressSection') : t('changePin')}
       </Text>
       <Text style={styles.subtitle}>{titles[step]}</Text>
+      {canChooseLength && (
+        <View style={styles.lengthChoice}>
+          {LENGTHS.map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[styles.chip, chosenLength === value && styles.chipActive]}
+              onPress={() => setChosenLength(value)}
+            >
+              <Text style={styles.chipText}>{t('digits', value)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {error !== '' && <Text style={styles.error}>{error}</Text>}
       <PinDots length={stepLength} filled={pin.length} error={error !== ''} />
       <PinPad onDigit={handleDigit} onDelete={() => setPin(pin.slice(0, -1))} />
@@ -120,6 +149,24 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#8b949e',
     fontSize: 17,
+  },
+  lengthChoice: {
+    flexDirection: 'row',
+    marginTop: 16,
+  },
+  chip: {
+    backgroundColor: '#21262d',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    marginHorizontal: 6,
+  },
+  chipActive: {
+    backgroundColor: '#1f6feb',
+  },
+  chipText: {
+    color: '#e6edf3',
+    fontSize: 14,
   },
   error: {
     color: '#f85149',
