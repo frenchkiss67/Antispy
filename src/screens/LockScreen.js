@@ -1,17 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as LocalAuthentication from 'expo-local-authentication';
 import PinPad, { PinDots } from '../components/PinPad';
-import { verifyPin } from '../security';
-import { saveCapture } from '../captures';
+import {
+  verifyPin,
+  verifyDuressPin,
+  registerAttempt,
+  resetAttempts,
+} from '../security';
+import { wipeVault } from '../vault';
+import { recordAttempt } from '../attempt';
+import useLockCountdown from '../hooks/useLockCountdown';
+import t from '../i18n';
 
-export default function LockScreen({ pinLength, onUnlock }) {
+const WIPE_THRESHOLD = 10;
+
+export default function LockScreen({ pinLength, settings, onUnlock }) {
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [lockRemaining, setLockRemaining] = useLockCountdown();
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -19,25 +32,40 @@ export default function LockScreen({ pinLength, onUnlock }) {
     }
   }, [permission]);
 
-  // Photographie silencieusement la personne en train de saisir le code.
-  const capturePhoto = async () => {
-    if (!cameraRef.current || !cameraReady || !permission?.granted) {
-      return null;
+  // Déverrouillage par empreinte ou visage : aucune photo n'est prise.
+  const handleBiometric = async () => {
+    if (busy) {
+      return;
     }
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.6,
-        skipProcessing: true,
-        shutterSound: false,
-      });
-      return photo?.uri ?? null;
-    } catch (e) {
-      return null;
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: t('biometricPrompt'),
+      cancelLabel: t('biometricCancel'),
+      disableDeviceFallback: true,
+    });
+    if (result.success) {
+      // Un déverrouillage biométrique réussi vaut succès : on efface le
+      // compteur d'échecs, sinon ils s'accumuleraient jusqu'à un éventuel
+      // effacement d'urgence sans qu'aucune attaque n'ait eu lieu.
+      await resetAttempts();
+      setLockRemaining(0);
+      onUnlock(false);
     }
   };
 
+  useEffect(() => {
+    (async () => {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled =
+        hasHardware && (await LocalAuthentication.isEnrolledAsync());
+      setBiometricAvailable(enrolled);
+      if (enrolled) {
+        handleBiometric();
+      }
+    })();
+  }, []);
+
   const handleDigit = async (digit) => {
-    if (busy || pin.length >= pinLength) {
+    if (busy || lockRemaining > 0 || pin.length >= pinLength) {
       return;
     }
     setError(false);
@@ -47,17 +75,25 @@ export default function LockScreen({ pinLength, onUnlock }) {
       return;
     }
     setBusy(true);
-    const photoUri = await capturePhoto();
-    const success = await verifyPin(next);
-    if (photoUri) {
-      try {
-        await saveCapture(photoUri, success);
-      } catch (e) {
-        // La photo n'a pas pu être enregistrée : on ne bloque pas la saisie.
-      }
+    const realPin = await verifyPin(next);
+    const duress = !realPin && (await verifyDuressPin(next));
+    const accepted = realPin || duress;
+    const { fails, lockSeconds } = await registerAttempt(accepted);
+    if (lockSeconds > 0) {
+      setLockRemaining(lockSeconds);
     }
-    if (success) {
-      onUnlock();
+    if (!accepted && settings.wipeEnabled && fails >= WIPE_THRESHOLD) {
+      await wipeVault();
+    }
+    await recordAttempt({
+      cameraRef,
+      cameraReady: cameraReady && permission?.granted,
+      success: accepted,
+      duress,
+      settings,
+    });
+    if (accepted) {
+      onUnlock(duress);
     } else {
       setError(true);
       setPin('');
@@ -76,19 +112,29 @@ export default function LockScreen({ pinLength, onUnlock }) {
           style={styles.hiddenCamera}
         />
       )}
-      <Text style={styles.title}>🛡️ Antispy</Text>
-      <Text style={styles.subtitle}>Saisissez votre code PIN</Text>
-      {error && <Text style={styles.error}>Code PIN incorrect</Text>}
+      <Text style={styles.title}>🛡️ {t('appName')}</Text>
+      <Text style={styles.subtitle}>{t('enterPin')}</Text>
+      {lockRemaining > 0 ? (
+        <Text style={styles.error}>{t('lockedFor', lockRemaining)}</Text>
+      ) : (
+        error && <Text style={styles.error}>{t('wrongPin')}</Text>
+      )}
       <PinDots length={pinLength} filled={pin.length} error={error} />
       <PinPad
         onDigit={handleDigit}
         onDelete={() => setPin(pin.slice(0, -1))}
-        disabled={busy}
+        disabled={busy || lockRemaining > 0}
       />
+      {biometricAvailable && (
+        <TouchableOpacity
+          style={styles.biometricButton}
+          onPress={handleBiometric}
+        >
+          <Text style={styles.biometricButtonText}>{t('biometricButton')}</Text>
+        </TouchableOpacity>
+      )}
       {permission && !permission.granted && (
-        <Text style={styles.warning}>
-          Autorisez la caméra pour activer la photo de surveillance.
-        </Text>
+        <Text style={styles.warning}>{t('cameraWarning')}</Text>
       )}
     </View>
   );
@@ -123,6 +169,17 @@ const styles = StyleSheet.create({
     color: '#f85149',
     fontSize: 14,
     marginTop: 12,
+  },
+  biometricButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#21262d',
+  },
+  biometricButtonText: {
+    color: '#58a6ff',
+    fontSize: 14,
   },
   warning: {
     color: '#d29922',

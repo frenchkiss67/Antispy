@@ -4,21 +4,29 @@
     "slug": "antispy",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0d1117"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.antispy.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
+        "NSCameraUsageDescription": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN.",
+        "NSFaceIDUsageDescription": "Antispy utilise Face ID pour déverrouiller l'application sans prendre de photo."
       }
     },
     "android": {
       "package": "com.antispy.app",
-      "permissions": ["CAMERA"]
+      "permissions": ["CAMERA"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d1117"
+      }
     },
     "plugins": [
       [
@@ -27,7 +35,33 @@
           "cameraPermission": "Antispy utilise la caméra frontale pour photographier la personne qui saisit le code PIN."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Antispy utilise Face ID pour déverrouiller l'application sans prendre de photo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Antispy enregistre la position des tentatives de déverrouillage (utile en cas de vol)."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Antispy importe des photos de votre galerie vers le coffre-fort privé."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "allowBackup": false
+          }
+        }
+      ]
     ]
   }
 }
