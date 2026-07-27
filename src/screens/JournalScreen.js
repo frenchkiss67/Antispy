@@ -16,6 +16,7 @@ import { deleteAllCaptures, deleteCapture, listCaptures } from '../captures';
 import { loadSettings, saveSettings } from '../settings';
 import { loadImageUri } from '../cryptoStore';
 import DecryptedImage from '../components/DecryptedImage';
+import LocationMap from '../components/LocationMap';
 import t from '../i18n';
 
 function formatDate(iso) {
@@ -33,6 +34,7 @@ export default function JournalScreen({ decoy }) {
   const [captures, setCaptures] = useState([]);
   const [lastSeen, setLastSeen] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [mapLocation, setMapLocation] = useState(null);
 
   useEffect(() => {
     // En mode contrainte (faux coffre), le journal reste vide : il ne doit
@@ -209,12 +211,22 @@ export default function JournalScreen({ decoy }) {
               </Text>
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => handleShare(selected.uris[0])}
-              >
-                <Text style={styles.modalButtonText}>↗ {t('share')}</Text>
-              </TouchableOpacity>
+              {selected.location && (
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setMapLocation(selected.location)}
+                >
+                  <Text style={styles.modalButtonText}>{t('viewOnMap')}</Text>
+                </TouchableOpacity>
+              )}
+              {selected.uris.length > 0 && (
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleShare(selected.uris[0])}
+                >
+                  <Text style={styles.modalButtonText}>↗ {t('share')}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonDanger]}
                 onPress={() => handleDeleteOne(selected)}
@@ -231,6 +243,12 @@ export default function JournalScreen({ decoy }) {
           </View>
         )}
       </Modal>
+
+      <LocationMap
+        location={mapLocation}
+        visible={mapLocation !== null}
+        onClose={() => setMapLocation(null)}
+      />
     </View>
   );
 }

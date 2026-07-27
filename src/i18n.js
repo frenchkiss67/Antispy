@@ -40,6 +40,10 @@ const fr = {
   deleteOneMessage: 'Supprimer cette tentative et ses photos ?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
   location: 'Position',
+  viewOnMap: '📍 Voir sur la carte',
+  openInMaps: 'Ouvrir dans Maps',
+  mapPrivacyNote:
+    'La carte est chargée depuis OpenStreetMap uniquement quand vous l’ouvrez.',
   vaultTitle: 'Coffre-fort',
   vaultEmpty:
     'Vos notes et photos privées, protégées par le code PIN.\nElles ne quittent jamais le stockage privé de l’application.',
@@ -133,6 +137,10 @@ const en = {
   deleteOneMessage: 'Delete this attempt and its photos?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
   location: 'Location',
+  viewOnMap: '📍 View on map',
+  openInMaps: 'Open in Maps',
+  mapPrivacyNote:
+    'The map is loaded from OpenStreetMap only when you open it.',
   vaultTitle: 'Vault',
   vaultEmpty:
     'Your private notes and photos, protected by the PIN code.\nThey never leave the app private storage.',
