@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import PinPad, { PinDots } from '../components/PinPad';
+import Icon from '../components/Icon';
 import { savePin } from '../security';
 import t from '../i18n';
 
@@ -12,6 +14,7 @@ export default function SetupScreen({ onDone }) {
   const [firstPin, setFirstPin] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
 
   const handleDigit = async (digit) => {
     if (pin.length >= length) {
@@ -32,6 +35,10 @@ export default function SetupScreen({ onDone }) {
       onDone();
     } else {
       setError(true);
+      setShakeKey((k) => k + 1);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+        () => {}
+      );
       setPin('');
       setFirstPin('');
       setStep('create');
@@ -43,7 +50,8 @@ export default function SetupScreen({ onDone }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🛡️ {t('appName')}</Text>
+      <Icon name="shield" size={44} color="#58a6ff" strokeWidth={1.6} />
+      <Text style={styles.title}>{t('appName')}</Text>
       <Text style={styles.subtitle}>
         {step === 'create' ? t('choosePin') : t('confirmPin')}
       </Text>
@@ -61,7 +69,12 @@ export default function SetupScreen({ onDone }) {
         </View>
       )}
       {error && <Text style={styles.error}>{t('pinMismatch')}</Text>}
-      <PinDots length={length} filled={pin.length} error={error} />
+      <PinDots
+        length={length}
+        filled={pin.length}
+        error={error}
+        shakeKey={shakeKey}
+      />
       <PinPad onDigit={handleDigit} onDelete={() => setPin(pin.slice(0, -1))} />
     </View>
   );

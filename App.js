@@ -15,10 +15,19 @@ import JournalScreen from './src/screens/JournalScreen';
 import VaultScreen from './src/screens/VaultScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePinScreen from './src/screens/ChangePinScreen';
+import Icon from './src/components/Icon';
 import { getPinLength, isPinDefined } from './src/security';
 import { DEFAULT_SETTINGS, loadSettings } from './src/settings';
 import { clearImageCache } from './src/cryptoStore';
 import t from './src/i18n';
+
+// Trois destinations, rien d'autre : « Verrouiller » est une action et vit
+// dans l'en-tête de chaque écran, pas dans la barre de navigation.
+const TABS = [
+  { key: 'journal', icon: 'journal', label: 'journal' },
+  { key: 'vault', icon: 'vault', label: 'vault' },
+  { key: 'settings', icon: 'settings', label: 'settings' },
+];
 
 export default function App() {
   // Bloque les captures d'écran (FLAG_SECURE Android, protection iOS).
@@ -129,35 +138,44 @@ export default function App() {
       {screen === 'home' && (
         <View style={styles.home}>
           <View style={styles.screen}>
-            {tab === 'journal' && <JournalScreen decoy={decoy} />}
-            {tab === 'vault' && <VaultScreen decoy={decoy} />}
+            {tab === 'journal' && <JournalScreen decoy={decoy} onLock={lock} />}
+            {tab === 'vault' && <VaultScreen decoy={decoy} onLock={lock} />}
             {tab === 'settings' && (
               <SettingsScreen
                 settings={settings}
                 onSettingsChange={setSettings}
                 onChangePin={() => openChangePin('pin')}
                 onSetDuress={() => openChangePin('duress')}
+                onLock={lock}
                 decoy={decoy}
               />
             )}
           </View>
           <View style={styles.tabBar}>
-            {[
-              ['journal', `📋 ${t('journal')}`],
-              ['vault', `🗄 ${t('vault')}`],
-              ['settings', `⚙️ ${t('settings')}`],
-            ].map(([key, label]) => (
-              <TouchableOpacity
-                key={key}
-                style={[styles.tabItem, tab === key && styles.tabItemActive]}
-                onPress={() => setTab(key)}
-              >
-                <Text style={styles.tabItemText}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.tabItem} onPress={lock}>
-              <Text style={styles.tabItemText}>{t('lock')}</Text>
-            </TouchableOpacity>
+            {TABS.map(({ key, icon, label }) => {
+              const active = tab === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.tabItem, active && styles.tabItemActive]}
+                  onPress={() => setTab(key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={t(label)}
+                >
+                  <Icon
+                    name={icon}
+                    size={21}
+                    color={active ? '#e6edf3' : '#8b949e'}
+                  />
+                  <Text
+                    style={[styles.tabItemText, !active && styles.tabItemMuted]}
+                  >
+                    {t(label)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}
@@ -165,7 +183,7 @@ export default function App() {
           d'applications quand l'app est déverrouillée en arrière-plan. */}
       {unlocked && !appActive && (
         <View style={styles.privacyCover}>
-          <Text style={styles.privacyCoverText}>🛡️</Text>
+          <Icon name="shield" size={64} color="#58a6ff" strokeWidth={1.5} />
         </View>
       )}
     </>
@@ -186,11 +204,13 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     paddingTop: 8,
     paddingHorizontal: 8,
+    gap: 4,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 10,
+    gap: 4,
+    paddingVertical: 8,
     borderRadius: 10,
   },
   tabItemActive: {
@@ -198,15 +218,15 @@ const styles = StyleSheet.create({
   },
   tabItemText: {
     color: '#e6edf3',
-    fontSize: 13,
+    fontSize: 11,
+  },
+  tabItemMuted: {
+    color: '#8b949e',
   },
   privacyCover: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0d1117',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  privacyCoverText: {
-    fontSize: 64,
   },
 });

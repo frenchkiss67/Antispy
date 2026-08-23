@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import Icon from './Icon';
 import {
   osmEmbedUrl,
   nativeMapsUrl,
@@ -42,9 +43,12 @@ export default function LocationMap({ location, visible, onClose }) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.coords}>📍 {formatCoords(location)}</Text>
+          <View style={styles.coordsRow}>
+            <Icon name="pin" size={16} color="#f85149" strokeWidth={2} />
+            <Text style={styles.coords}>{formatCoords(location)}</Text>
+          </View>
           <TouchableOpacity onPress={onClose}>
-            <Text style={styles.close}>✕</Text>
+            <Icon name="close" size={22} color="#e6edf3" strokeWidth={1.8} />
           </TouchableOpacity>
         </View>
         <View style={styles.mapWrapper}>
@@ -63,7 +67,8 @@ export default function LocationMap({ location, visible, onClose }) {
         </View>
         <Text style={styles.note}>{t('mapPrivacyNote')}</Text>
         <TouchableOpacity style={styles.button} onPress={openInMaps}>
-          <Text style={styles.buttonText}>🗺️ {t('openInMaps')}</Text>
+          <Icon name="map" size={18} color="#ffffff" strokeWidth={1.8} />
+          <Text style={styles.buttonText}>{t('openInMaps')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -82,6 +87,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 12,
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   coords: {
     color: '#e6edf3',
@@ -116,6 +126,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   button: {
+    flexDirection: 'row',
+    gap: 8,
     margin: 20,
     paddingVertical: 14,
     borderRadius: 10,

@@ -13,6 +13,8 @@ import * as Location from 'expo-location';
 import { saveSettings } from '../settings';
 import { isDuressDefined, removeDuressPin } from '../security';
 import { sendIntrusionAlert } from '../webhook';
+import ScreenHeader from '../components/ScreenHeader';
+import Icon from '../components/Icon';
 import t from '../i18n';
 
 const GRACE_OPTIONS = [0, 30, 60, 300];
@@ -32,6 +34,7 @@ export default function SettingsScreen({
   onSettingsChange,
   onChangePin,
   onSetDuress,
+  onLock,
   decoy,
 }) {
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
@@ -92,11 +95,13 @@ export default function SettingsScreen({
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{t('settingsTitle')}</Text>
+    <View style={styles.container}>
+      <ScreenHeader title={t('settingsTitle')} onLock={onLock} />
+      <ScrollView contentContainerStyle={styles.content}>
 
       <TouchableOpacity style={styles.actionButton} onPress={onChangePin}>
-        <Text style={styles.actionButtonText}>🔑 {t('changePin')}</Text>
+        <Icon name="key" size={18} color="#e6edf3" strokeWidth={1.8} />
+        <Text style={styles.actionButtonText}>{t('changePin')}</Text>
       </TouchableOpacity>
 
       {!decoy && (
@@ -213,7 +218,8 @@ export default function SettingsScreen({
       )}
 
       {!decoy && <Text style={styles.about}>{t('about')}</Text>}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -223,7 +229,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d1117',
   },
   content: {
-    paddingTop: 60,
+    paddingTop: 6,
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
@@ -234,6 +240,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#21262d',
     paddingVertical: 14,
     paddingHorizontal: 16,

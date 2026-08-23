@@ -20,11 +20,13 @@ import {
   saveNote,
 } from '../vault';
 import DecryptedImage from '../components/DecryptedImage';
+import ScreenHeader from '../components/ScreenHeader';
+import Icon from '../components/Icon';
 import t from '../i18n';
 
 // decoy : ouvert avec le code de contrainte, l'écran travaille sur le faux
 // coffre, distinct du vrai et identique en apparence.
-export default function VaultScreen({ decoy }) {
+export default function VaultScreen({ decoy, onLock }) {
   const [tab, setTab] = useState('notes'); // 'notes' | 'photos'
   const [notes, setNotes] = useState([]);
   const [photos, setPhotos] = useState([]);
@@ -88,7 +90,7 @@ export default function VaultScreen({ decoy }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('vaultTitle')}</Text>
+      <ScreenHeader title={t('vaultTitle')} onLock={onLock} />
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, tab === 'notes' && styles.tabActive]}
@@ -214,13 +216,15 @@ export default function VaultScreen({ decoy }) {
                 style={[styles.editButton, styles.editButtonDanger]}
                 onPress={() => handleDeletePhoto(viewing.id)}
               >
-                <Text style={styles.editButtonText}>🗑 {t('delete')}</Text>
+                <Icon name="trash" size={16} color="#fff" strokeWidth={1.9} />
+                <Text style={styles.editButtonText}>{t('delete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.editButton}
                 onPress={() => setViewing(null)}
               >
-                <Text style={styles.editButtonText}>✕ {t('close')}</Text>
+                <Icon name="close" size={16} color="#fff" strokeWidth={1.9} />
+                <Text style={styles.editButtonText}>{t('close')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -234,7 +238,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0d1117',
-    paddingTop: 60,
+    paddingTop: 0,
   },
   title: {
     color: '#e6edf3',
@@ -329,6 +333,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: '#21262d',
     paddingVertical: 10,
     paddingHorizontal: 16,
