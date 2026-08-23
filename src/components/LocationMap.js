@@ -28,10 +28,14 @@ export default function LocationMap({ location, visible, onClose }) {
     return null;
   }
 
-  const openInMaps = async () => {
-    const native = nativeMapsUrl(location);
-    const supported = await Linking.canOpenURL(native).catch(() => false);
-    Linking.openURL(supported ? native : webMapsUrl(location)).catch(() => {});
+  // Depuis Android 11, les restrictions de visibilité des paquets font que
+  // canOpenURL('geo:…') renvoie false même quand une application de cartes est
+  // installée (aucun bloc <queries> n'est déclaré par défaut). On tente donc
+  // l'ouverture directe et on ne se rabat sur le web que si elle échoue.
+  const openInMaps = () => {
+    Linking.openURL(nativeMapsUrl(location)).catch(() => {
+      Linking.openURL(webMapsUrl(location)).catch(() => {});
+    });
   };
 
   return (
@@ -49,7 +53,6 @@ export default function LocationMap({ location, visible, onClose }) {
               source={{ uri: osmEmbedUrl(location) }}
               style={styles.map}
               onLoadEnd={() => setLoading(false)}
-              startInLoadingState
             />
           )}
           {loading && (

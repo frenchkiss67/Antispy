@@ -4,7 +4,6 @@ const fr = {
   appName: 'Antispy',
   choosePin: 'Choisissez votre code PIN',
   confirmPin: 'Confirmez votre code PIN',
-  choosePinLength: 'Longueur du code',
   digits: (n) => `${n} chiffres`,
   duressRemovedByLength:
     'La longueur du code a changé : le code de contrainte a été supprimé, redéfinissez-le si besoin.',
@@ -39,7 +38,6 @@ const fr = {
   close: 'Fermer',
   deleteOneMessage: 'Supprimer cette tentative et ses photos ?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
-  location: 'Position',
   viewOnMap: '📍 Voir sur la carte',
   openInMaps: 'Ouvrir dans Maps',
   mapPrivacyNote:
@@ -101,7 +99,6 @@ const en = {
   appName: 'Antispy',
   choosePin: 'Choose your PIN code',
   confirmPin: 'Confirm your PIN code',
-  choosePinLength: 'Code length',
   digits: (n) => `${n} digits`,
   duressRemovedByLength:
     'The code length changed: the duress code was removed, set it again if needed.',
@@ -136,7 +133,6 @@ const en = {
   close: 'Close',
   deleteOneMessage: 'Delete this attempt and its photos?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
-  location: 'Location',
   viewOnMap: '📍 View on map',
   openInMaps: 'Open in Maps',
   mapPrivacyNote:
