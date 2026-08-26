@@ -164,6 +164,8 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
                   ]}
                   onPress={() => handleKey(key)}
                   onLongPress={key === '=' ? handleBiometric : undefined}
+                  accessibilityRole="button"
+                  accessibilityLabel={key}
                 >
                   <Text
                     style={[

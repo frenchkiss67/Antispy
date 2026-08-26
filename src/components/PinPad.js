@@ -153,6 +153,7 @@ export function PinDots({
         return (
           <Animated.View
             key={i}
+            testID="pin-dot"
             style={[
               styles.dot,
               on && styles.dotFilled,

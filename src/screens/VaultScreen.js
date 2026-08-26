@@ -86,7 +86,10 @@ export default function VaultScreen({ decoy, onLock }) {
   };
 
   const photoSize = (Dimensions.get('window').width - 56) / 3;
-  const isEmpty = notes.length === 0 && photos.length === 0;
+  // Vacuité calculée par onglet : avec un coffre contenant des photos mais
+  // aucune note, l'onglet Notes affichait une zone vide sans le moindre
+  // message — l'écran paraissait cassé.
+  const isEmpty = tab === 'notes' ? notes.length === 0 : photos.length === 0;
 
   return (
     <View style={styles.container}>

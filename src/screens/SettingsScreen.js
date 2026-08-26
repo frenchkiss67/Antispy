@@ -51,8 +51,10 @@ export default function SettingsScreen({
     onSettingsChange(await saveSettings(partial));
   };
 
-  const handleWebhookSave = () => {
-    const trimmed = webhookUrl.trim();
+  // La valeur validée est lue sur l'événement, pas dans l'état : à la fin de
+  // saisie, l'état peut ne pas encore avoir été répercuté.
+  const handleWebhookSave = (value) => {
+    const trimmed = (value ?? webhookUrl).trim();
     if (trimmed !== '' && !/^https:\/\//i.test(trimmed)) {
       Alert.alert(t('webhook'), t('webhookHttpsOnly'));
       return;
@@ -85,8 +87,13 @@ export default function SettingsScreen({
   };
 
   const handleWebhookTest = async () => {
+    const url = webhookUrl.trim();
+    if (!/^https:\/\//i.test(url)) {
+      Alert.alert(t('webhook'), t('webhookHttpsOnly'));
+      return;
+    }
     setTesting(true);
-    const ok = await sendIntrusionAlert(webhookUrl.trim(), {
+    const ok = await sendIntrusionAlert(url, {
       date: new Date().toISOString(),
       test: true,
     });
@@ -195,7 +202,7 @@ export default function SettingsScreen({
             style={styles.input}
             value={webhookUrl}
             onChangeText={setWebhookUrl}
-            onEndEditing={handleWebhookSave}
+            onEndEditing={(e) => handleWebhookSave(e?.nativeEvent?.text)}
             placeholder={t('webhookPlaceholder')}
             placeholderTextColor="#8b949e"
             autoCapitalize="none"
