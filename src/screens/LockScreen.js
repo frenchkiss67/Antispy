@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
@@ -28,6 +33,10 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
   const [shakeKey, setShakeKey] = useState(0);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [lockRemaining, setLockRemaining] = useLockCountdown();
+  // Sur un petit écran, le gabarit pleine taille coupait la dernière
+  // rangée du pavé (biométrie / 0 / effacer).
+  const { height } = useWindowDimensions();
+  const compact = height < 800;
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -111,7 +120,7 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       {permission?.granted && (
         <CameraView
           ref={cameraRef}
@@ -122,14 +131,23 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
         />
       )}
 
-      <View style={styles.header}>
-        <Icon name="shield" size={52} color="#58a6ff" strokeWidth={1.6} />
-        <Text style={styles.title}>{t('appName')}</Text>
-        <Text style={styles.subtitle}>{t('enterPin')}</Text>
+      <View style={[styles.header, compact && styles.headerCompact]}>
+        <Icon
+          name="shield"
+          size={compact ? 40 : 52}
+          color="#58a6ff"
+          strokeWidth={1.6}
+        />
+        <Text style={[styles.title, compact && styles.titleCompact]}>
+          {t('appName')}
+        </Text>
+        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>
+          {t('enterPin')}
+        </Text>
       </View>
 
       {/* Hauteur fixe : le message ne doit pas décaler les points. */}
-      <View style={styles.messageSlot}>
+      <View style={[styles.messageSlot, compact && styles.messageSlotCompact]}>
         {lockRemaining > 0 ? (
           <Text style={styles.error}>{t('lockedFor', lockRemaining)}</Text>
         ) : error ? (
@@ -143,6 +161,7 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
         error={error}
         shakeKey={shakeKey}
         verifying={busy}
+        compact={compact}
       />
 
       {/* Pousse le pavé en bas : la zone que le pouce atteint d'une main. */}
@@ -153,6 +172,7 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
         onDelete={() => setPin(pin.slice(0, -1))}
         onBiometric={biometricAvailable ? handleBiometric : undefined}
         disabled={busy || lockRemaining > 0}
+        compact={compact}
       />
 
       {permission && !permission.granted && (
@@ -170,6 +190,10 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 44,
   },
+  containerCompact: {
+    paddingTop: 28,
+    paddingBottom: 24,
+  },
   hiddenCamera: {
     position: 'absolute',
     top: 0,
@@ -182,19 +206,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  headerCompact: {
+    gap: 8,
+  },
   title: {
     color: '#e6edf3',
     fontSize: 32,
     fontWeight: '700',
   },
+  titleCompact: {
+    fontSize: 26,
+  },
   subtitle: {
     color: '#8b949e',
     fontSize: 17,
+  },
+  subtitleCompact: {
+    fontSize: 15,
   },
   messageSlot: {
     height: 26,
     justifyContent: 'center',
     marginTop: 10,
+  },
+  messageSlotCompact: {
+    height: 22,
+    marginTop: 6,
   },
   error: {
     color: '#f85149',

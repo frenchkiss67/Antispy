@@ -10,7 +10,32 @@ const KEYS = [
   ['bio', '0', 'del'],
 ];
 
-export default function PinPad({ onDigit, onDelete, onBiometric, disabled }) {
+// Deux gabarits : sur un petit écran (iPhone SE, petits Android), le pavé
+// pleine taille ne tient pas sous l'en-tête et la dernière rangée serait
+// coupée. Le gabarit compact garde le pavé entier et atteignable.
+const SIZES = {
+  normal: { key: 76, margin: 10, font: 28, bio: 30, del: 28, dotGap: 24 },
+  compact: { key: 64, margin: 7, font: 24, bio: 26, del: 24, dotGap: 14 },
+};
+
+export function padMetrics(compact) {
+  return compact ? SIZES.compact : SIZES.normal;
+}
+
+const LABELS = {
+  bio: 'Déverrouiller par empreinte ou visage',
+  del: 'Effacer le dernier chiffre',
+};
+
+export default function PinPad({
+  onDigit,
+  onDelete,
+  onBiometric,
+  disabled,
+  compact,
+}) {
+  const s = padMetrics(compact);
+
   const handlePress = (key) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (key === 'del') {
@@ -22,6 +47,8 @@ export default function PinPad({ onDigit, onDelete, onBiometric, disabled }) {
     }
   };
 
+  const cell = { width: s.key, height: s.key, margin: s.margin };
+
   return (
     <View style={styles.pad}>
       {KEYS.map((row, rowIndex) => (
@@ -30,23 +57,32 @@ export default function PinPad({ onDigit, onDelete, onBiometric, disabled }) {
             // La biométrie occupe la case libre en bas à gauche : elle
             // devient atteignable au pouce, au lieu d'un bouton texte isolé.
             if (key === 'bio' && !onBiometric) {
-              return <View key={key} style={styles.keyEmpty} />;
+              return <View key={key} style={cell} />;
             }
             const plain = key === 'bio' || key === 'del';
             return (
               <TouchableOpacity
                 key={key}
-                style={[styles.key, plain && styles.keyPlain]}
-                disabled={disabled}
+                style={[
+                  styles.key,
+                  cell,
+                  { borderRadius: s.key / 2 },
+                  plain && styles.keyPlain,
+                ]}
+                // La biométrie reste active même pendant un blocage
+                // anti-bruteforce : elle prouve l'identité du propriétaire,
+                // le blocage ne vise que les essais de code.
+                disabled={key === 'bio' ? false : disabled}
                 onPress={() => handlePress(key)}
+                accessibilityRole="button"
                 accessibilityLabel={LABELS[key] ?? key}
               >
                 {key === 'bio' ? (
-                  <Icon name="fingerprint" size={30} color="#58a6ff" strokeWidth={1.5} />
+                  <Icon name="fingerprint" size={s.bio} color="#58a6ff" strokeWidth={1.5} />
                 ) : key === 'del' ? (
-                  <Icon name="backspace" size={28} color="#8b949e" strokeWidth={1.6} />
+                  <Icon name="backspace" size={s.del} color="#8b949e" strokeWidth={1.6} />
                 ) : (
-                  <Text style={styles.keyText}>{key}</Text>
+                  <Text style={[styles.keyText, { fontSize: s.font }]}>{key}</Text>
                 )}
               </TouchableOpacity>
             );
@@ -57,16 +93,18 @@ export default function PinPad({ onDigit, onDelete, onBiometric, disabled }) {
   );
 }
 
-const LABELS = {
-  bio: 'Déverrouiller par empreinte ou visage',
-  del: 'Effacer le dernier chiffre',
-};
-
-// filled  : nombre de chiffres saisis
-// error   : la saisie vient d'échouer (points rouges)
-// shakeKey: incrémenté à chaque échec pour rejouer la secousse
+// filled    : nombre de chiffres saisis
+// error     : la saisie vient d'échouer (points rouges)
+// shakeKey  : incrémenté à chaque échec pour rejouer la secousse
 // verifying : vérification en cours (le dernier point pulse)
-export function PinDots({ length, filled, error, shakeKey = 0, verifying }) {
+export function PinDots({
+  length,
+  filled,
+  error,
+  shakeKey = 0,
+  verifying,
+  compact,
+}) {
   const shift = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -102,7 +140,13 @@ export function PinDots({ length, filled, error, shakeKey = 0, verifying }) {
   }, [verifying]);
 
   return (
-    <Animated.View style={[styles.dots, { transform: [{ translateX: shift }] }]}>
+    <Animated.View
+      style={[
+        styles.dots,
+        { marginVertical: padMetrics(compact).dotGap },
+        { transform: [{ translateX: shift }] },
+      ]}
+    >
       {Array.from({ length }).map((_, i) => {
         const on = i < filled;
         const isLast = verifying && i === filled - 1;
@@ -130,10 +174,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   key: {
-    width: 76,
-    height: 76,
-    margin: 10,
-    borderRadius: 38,
     backgroundColor: '#21262d',
     alignItems: 'center',
     justifyContent: 'center',
@@ -141,20 +181,13 @@ const styles = StyleSheet.create({
   keyPlain: {
     backgroundColor: 'transparent',
   },
-  keyEmpty: {
-    width: 76,
-    height: 76,
-    margin: 10,
-  },
   keyText: {
     color: '#e6edf3',
-    fontSize: 28,
     fontWeight: '500',
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginVertical: 24,
   },
   dot: {
     width: 16,

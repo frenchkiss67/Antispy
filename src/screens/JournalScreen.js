@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   menuPanel: {
     position: 'absolute',
-    top: 96,
+    top: 106,
     right: 20,
     backgroundColor: '#21262d',
     borderRadius: 10,
