@@ -67,7 +67,7 @@ export async function getAttemptLocation(enabled) {
 // persistance — localisation GPS (jusqu'à plusieurs secondes), écriture
 // chiffrée, webhook — s'exécute en arrière-plan pour ne pas retarder le
 // déverrouillage d'un code correct. Renvoie la promesse de persistance
-// pour les tests ou un éventuel await volontaire.
+// dans un objet, pour les tests ou un éventuel await volontaire.
 export async function recordAttempt({
   cameraRef,
   cameraReady,
@@ -79,7 +79,11 @@ export async function recordAttempt({
   if (cameraRef.current && cameraReady) {
     photos = await captureBurst(cameraRef, success ? 1 : 3);
   }
-  return (async () => {
+  // La promesse est renvoyée DANS un objet, jamais nue : une fonction async
+  // qui retourne une promesse l'adopte, et l'appelant qui fait
+  // `await recordAttempt(...)` attendrait alors la localisation GPS
+  // (jusqu'à 4 s) avant d'ouvrir l'application.
+  const persistence = (async () => {
     const location = await getAttemptLocation(settings.locationEnabled);
     try {
       await saveCapture({ photos, success, duress, location });
@@ -95,4 +99,5 @@ export async function recordAttempt({
       });
     }
   })();
+  return { persistence };
 }

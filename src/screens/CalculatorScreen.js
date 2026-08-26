@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +33,16 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
   // Compte à rebours silencieux : aucun indice visuel, mais le blocage
   // anti-bruteforce s'applique aussi derrière la calculatrice.
   const [lockRemaining, setLockRemaining] = useLockCountdown();
+  // Touches dimensionnées d'après la largeur réelle : à 80 px fixes, le
+  // pavé fait 368 px et la colonne des opérateurs sortait de l'écran sur
+  // les Android de 360 dp — une calculatrice tronquée trahit le camouflage.
+  const { width } = useWindowDimensions();
+  const keySize = Math.max(58, Math.min(80, Math.floor((width - 32) / 4) - 12));
+  const keyStyle = {
+    width: keySize,
+    height: keySize,
+    borderRadius: keySize / 2,
+  };
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -136,21 +152,25 @@ export default function CalculatorScreen({ pinLength, settings, onUnlock }) {
           <View key={rowIndex} style={styles.row}>
             {row.map((key, keyIndex) =>
               key === '' ? (
-                <View key={keyIndex} style={styles.keyEmpty} />
+                <View key={keyIndex} style={[styles.keyEmpty, keyStyle]} />
               ) : (
                 <TouchableOpacity
                   key={keyIndex}
                   style={[
                     styles.key,
+                    keyStyle,
                     key === '=' && styles.keyEquals,
                     ['÷', '×', '−', '+', '%'].includes(key) && styles.keyOp,
                   ]}
                   onPress={() => handleKey(key)}
                   onLongPress={key === '=' ? handleBiometric : undefined}
+                  accessibilityRole="button"
+                  accessibilityLabel={key}
                 >
                   <Text
                     style={[
                       styles.keyText,
+                      { fontSize: Math.round(keySize * 0.375) },
                       key === '=' && styles.keyEqualsText,
                     ]}
                   >
@@ -204,17 +224,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   key: {
-    width: 80,
-    height: 80,
     margin: 6,
-    borderRadius: 40,
     backgroundColor: '#1c1c1e',
     alignItems: 'center',
     justifyContent: 'center',
   },
   keyEmpty: {
-    width: 80,
-    height: 80,
     margin: 6,
   },
   keyOp: {
@@ -225,7 +240,6 @@ const styles = StyleSheet.create({
   },
   keyText: {
     color: '#ffffff',
-    fontSize: 30,
     fontWeight: '400',
   },
   keyEqualsText: {

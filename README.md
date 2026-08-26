@@ -25,7 +25,9 @@ seule la saisie du code PIN prend une photo.
   même le bon code n'ouvre pas pendant le délai.
 - **Journal détaillé** : photo en plein écran (balayage entre les clichés
   de la rafale), date/heure, position GPS, partage et suppression
-  individuelle ou totale.
+  individuelle ou totale. Une tentative géolocalisée s'affiche sur une
+  **mini-carte** (OpenStreetMap, chargée uniquement à la demande) et
+  s'ouvre dans l'application de cartes du téléphone.
 - **Mode camouflage** : l'écran de verrouillage devient une vraie
   calculatrice. Tapez votre PIN puis `=` pour déverrouiller
   (appui long sur `=` pour la biométrie). Toute saisie de 4 chiffres
@@ -41,6 +43,25 @@ seule la saisie du code PIN prend une photo.
   5 min) quand l'application passe en arrière-plan.
 - **Interface en français et en anglais** (langue du téléphone),
   retour haptique sur les pavés.
+
+## Ergonomie
+
+Six corrections appliquées à partir d'une revue du parcours réel :
+
+- **Pavé ancré en bas de l'écran**, dans la zone que le pouce atteint d'une
+  seule main, au lieu d'être centré verticalement.
+- **Biométrie intégrée au pavé** (case libre en bas à gauche) plutôt qu'un
+  bouton texte isolé sous le clavier.
+- **« Verrouiller » remonté dans l'en-tête** : la barre du bas ne contient
+  plus que les trois destinations, un appui distrait ne ferme plus la session.
+- **Icônes dessinées au trait** (grille 24 px) à la place des emojis, qui
+  changeaient de rendu selon l'appareil et ne se recoloraient pas selon l'état.
+- **Échec de code perceptible** : points rouges, secousse horizontale et
+  vibration d'erreur, au lieu d'une simple ligne de texte.
+- **Retour pendant la vérification** : le dernier point pulse tant que
+  l'étirement du code tourne, pour ne pas laisser croire à un appui manqué.
+- **« Tout supprimer » déplacé dans le menu d'en-tête**, hors de la zone du
+  pouce et hors de la liste.
 
 ## Sécurité
 
@@ -149,8 +170,12 @@ src/vault.js                    Coffre-fort chiffré (vrai + leurre), effacement
 src/attempt.js                  Traitement d'une tentative : rafale, GPS, webhook
 src/webhook.js                  Envoi de l'alerte distante (HTTPS uniquement)
 src/hooks/useLockCountdown.js   Compte à rebours anti-bruteforce persistant
-src/components/PinPad.js        Pavé numérique avec retour haptique
+src/components/PinPad.js        Pavé numérique, secousse, pulsation, haptique
+src/components/Icon.js          Jeu d'icônes au trait (react-native-svg)
+src/components/ScreenHeader.js  En-tête commun : titre, menu, « Verrouiller »
 src/components/DecryptedImage.js Affichage d'images chiffrées (déchiffrement en mémoire)
+src/components/LocationMap.js   Mini-carte OpenStreetMap d'une tentative (WebView)
+src/maps.js                     URLs de carte (OpenStreetMap, app de cartes native)
 src/screens/SetupScreen.js      Création du code PIN
 src/screens/LockScreen.js       Verrouillage classique + photo discrète
 src/screens/CalculatorScreen.js Verrouillage camouflé en calculatrice

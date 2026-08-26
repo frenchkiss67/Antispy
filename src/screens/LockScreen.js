@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Haptics from 'expo-haptics';
 import PinPad, { PinDots } from '../components/PinPad';
+import Icon from '../components/Icon';
 import {
   verifyPin,
   verifyDuressPin,
@@ -23,8 +30,13 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [lockRemaining, setLockRemaining] = useLockCountdown();
+  // Sur un petit écran, le gabarit pleine taille coupait la dernière
+  // rangée du pavé (biométrie / 0 / effacer).
+  const { height } = useWindowDimensions();
+  const compact = height < 800;
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -95,14 +107,20 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
     if (accepted) {
       onUnlock(duress);
     } else {
+      // Points rouges, secousse et vibration : un code faux doit se voir
+      // du coin de l'œil, sinon il passe pour un appui manqué.
       setError(true);
+      setShakeKey((k) => k + 1);
       setPin('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+        () => {}
+      );
     }
     setBusy(false);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       {permission?.granted && (
         <CameraView
           ref={cameraRef}
@@ -112,27 +130,51 @@ export default function LockScreen({ pinLength, settings, onUnlock }) {
           style={styles.hiddenCamera}
         />
       )}
-      <Text style={styles.title}>🛡️ {t('appName')}</Text>
-      <Text style={styles.subtitle}>{t('enterPin')}</Text>
-      {lockRemaining > 0 ? (
-        <Text style={styles.error}>{t('lockedFor', lockRemaining)}</Text>
-      ) : (
-        error && <Text style={styles.error}>{t('wrongPin')}</Text>
-      )}
-      <PinDots length={pinLength} filled={pin.length} error={error} />
+
+      <View style={[styles.header, compact && styles.headerCompact]}>
+        <Icon
+          name="shield"
+          size={compact ? 40 : 52}
+          color="#58a6ff"
+          strokeWidth={1.6}
+        />
+        <Text style={[styles.title, compact && styles.titleCompact]}>
+          {t('appName')}
+        </Text>
+        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>
+          {t('enterPin')}
+        </Text>
+      </View>
+
+      {/* Hauteur fixe : le message ne doit pas décaler les points. */}
+      <View style={[styles.messageSlot, compact && styles.messageSlotCompact]}>
+        {lockRemaining > 0 ? (
+          <Text style={styles.error}>{t('lockedFor', lockRemaining)}</Text>
+        ) : error ? (
+          <Text style={styles.error}>{t('wrongPin')}</Text>
+        ) : null}
+      </View>
+
+      <PinDots
+        length={pinLength}
+        filled={pin.length}
+        error={error}
+        shakeKey={shakeKey}
+        verifying={busy}
+        compact={compact}
+      />
+
+      {/* Pousse le pavé en bas : la zone que le pouce atteint d'une main. */}
+      <View style={styles.spacer} />
+
       <PinPad
         onDigit={handleDigit}
         onDelete={() => setPin(pin.slice(0, -1))}
+        onBiometric={biometricAvailable ? handleBiometric : undefined}
         disabled={busy || lockRemaining > 0}
+        compact={compact}
       />
-      {biometricAvailable && (
-        <TouchableOpacity
-          style={styles.biometricButton}
-          onPress={handleBiometric}
-        >
-          <Text style={styles.biometricButtonText}>{t('biometricButton')}</Text>
-        </TouchableOpacity>
-      )}
+
       {permission && !permission.granted && (
         <Text style={styles.warning}>{t('cameraWarning')}</Text>
       )}
@@ -145,7 +187,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0d1117',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingTop: 64,
+    paddingBottom: 44,
+  },
+  containerCompact: {
+    paddingTop: 28,
+    paddingBottom: 24,
   },
   hiddenCamera: {
     position: 'absolute',
@@ -155,36 +202,48 @@ const styles = StyleSheet.create({
     height: 1,
     opacity: 0,
   },
+  header: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerCompact: {
+    gap: 8,
+  },
   title: {
     color: '#e6edf3',
     fontSize: 32,
     fontWeight: '700',
-    marginBottom: 12,
+  },
+  titleCompact: {
+    fontSize: 26,
   },
   subtitle: {
     color: '#8b949e',
     fontSize: 17,
   },
+  subtitleCompact: {
+    fontSize: 15,
+  },
+  messageSlot: {
+    height: 26,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  messageSlotCompact: {
+    height: 22,
+    marginTop: 6,
+  },
   error: {
     color: '#f85149',
     fontSize: 14,
-    marginTop: 12,
   },
-  biometricButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    backgroundColor: '#21262d',
-  },
-  biometricButtonText: {
-    color: '#58a6ff',
-    fontSize: 14,
+  spacer: {
+    flexGrow: 1,
   },
   warning: {
     color: '#d29922',
     fontSize: 13,
-    marginTop: 24,
+    marginTop: 20,
     marginHorizontal: 32,
     textAlign: 'center',
   },

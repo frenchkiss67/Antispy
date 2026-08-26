@@ -1,6 +1,15 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
 import PinPad, { PinDots } from '../components/PinPad';
+import Icon from '../components/Icon';
 import {
   savePin,
   saveDuressPin,
@@ -28,6 +37,20 @@ export default function ChangePinScreen({
   const [pin, setPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
+  const [shakeKey, setShakeKey] = useState(0);
+  // Même gabarit compact que l'écran de verrouillage : sans lui, le pavé
+  // dépasse le bas de l'écran sur les petits téléphones.
+  const { height } = useWindowDimensions();
+  const compact = height < 800;
+
+  // Un refus doit se voir : points rouges, secousse et vibration.
+  const fail = (message) => {
+    setError(message);
+    setShakeKey((k) => k + 1);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+      () => {}
+    );
+  };
   const [chosenLength, setChosenLength] = useState(pinLength);
 
   const duressTarget = mode === 'duress' || decoy;
@@ -60,7 +83,7 @@ export default function ChangePinScreen({
         setPin('');
         setStep('new');
       } else {
-        setError(t('wrongPin'));
+        fail(t('wrongPin'));
         setPin('');
       }
       return;
@@ -71,7 +94,7 @@ export default function ChangePinScreen({
         ? await verifyPin(next)
         : await verifyDuressPin(next);
       if (collision) {
-        setError(t('duressSameAsPin'));
+        fail(t('duressSameAsPin'));
         setPin('');
         return;
       }
@@ -97,7 +120,7 @@ export default function ChangePinScreen({
       }
       onDone();
     } else {
-      setError(t('pinMismatch'));
+      fail(t('pinMismatch'));
       setPin('');
       setNewPin('');
       setStep('new');
@@ -106,8 +129,14 @@ export default function ChangePinScreen({
 
   return (
     <View style={styles.container}>
+      <Icon
+        name="key"
+        size={compact ? 32 : 40}
+        color="#58a6ff"
+        strokeWidth={1.6}
+      />
       <Text style={styles.title}>
-        🔑 {mode === 'duress' ? t('duressSection') : t('changePin')}
+        {mode === 'duress' ? t('duressSection') : t('changePin')}
       </Text>
       <Text style={styles.subtitle}>{titles[step]}</Text>
       {canChooseLength && (
@@ -124,8 +153,18 @@ export default function ChangePinScreen({
         </View>
       )}
       {error !== '' && <Text style={styles.error}>{error}</Text>}
-      <PinDots length={stepLength} filled={pin.length} error={error !== ''} />
-      <PinPad onDigit={handleDigit} onDelete={() => setPin(pin.slice(0, -1))} />
+      <PinDots
+        length={stepLength}
+        filled={pin.length}
+        error={error !== ''}
+        shakeKey={shakeKey}
+        compact={compact}
+      />
+      <PinPad
+        onDigit={handleDigit}
+        onDelete={() => setPin(pin.slice(0, -1))}
+        compact={compact}
+      />
       <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
         <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
       </TouchableOpacity>

@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,9 @@ import { deleteAllCaptures, deleteCapture, listCaptures } from '../captures';
 import { loadSettings, saveSettings } from '../settings';
 import { loadImageUri } from '../cryptoStore';
 import DecryptedImage from '../components/DecryptedImage';
+import LocationMap from '../components/LocationMap';
+import ScreenHeader, { HeaderAction } from '../components/ScreenHeader';
+import Icon from '../components/Icon';
 import t from '../i18n';
 
 function formatDate(iso) {
@@ -29,10 +33,12 @@ function formatDate(iso) {
   });
 }
 
-export default function JournalScreen({ decoy }) {
+export default function JournalScreen({ decoy, onLock }) {
   const [captures, setCaptures] = useState([]);
   const [lastSeen, setLastSeen] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [mapLocation, setMapLocation] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // En mode contrainte (faux coffre), le journal reste vide : il ne doit
@@ -52,15 +58,21 @@ export default function JournalScreen({ decoy }) {
   const newCaptures = captures.filter(isNew);
   const newFailed = newCaptures.filter((c) => !c.success).length;
 
+  // La suppression globale vit dans le menu d'en-tête : c'est l'action la
+  // plus irréversible de l'application, elle n'a rien à faire en permanence
+  // sous le pouce, au bas de la liste.
   const handleDeleteAll = () => {
-    Alert.alert(t('deleteAllTitle'), t('deleteAllMessage'), [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('delete'),
-        style: 'destructive',
-        onPress: async () => setCaptures(await deleteAllCaptures()),
-      },
-    ]);
+    setMenuOpen(false);
+    setTimeout(() => {
+      Alert.alert(t('deleteAllTitle'), t('deleteAllMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: async () => setCaptures(await deleteAllCaptures()),
+        },
+      ]);
+    }, 250);
   };
 
   const handleDeleteOne = (capture) => {
@@ -104,16 +116,41 @@ export default function JournalScreen({ decoy }) {
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+  const verdict = (item) => {
+    if (item.duress) {
+      return { label: t('codeDuress'), style: styles.badgeDuress };
+    }
+    return item.success
+      ? { label: t('codeOk'), style: styles.badgeOk }
+      : { label: t('codeKo'), style: styles.badgeKo };
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('journalTitle')}</Text>
+      <ScreenHeader title={t('journalTitle')} onLock={onLock}>
+        {captures.length > 0 && (
+          <HeaderAction
+            icon="more"
+            onPress={() => setMenuOpen(true)}
+            label={t('menu')}
+          />
+        )}
+      </ScreenHeader>
+
       {newCaptures.length > 0 && (
         <View style={[styles.banner, newFailed > 0 && styles.bannerAlert]}>
+          <Icon
+            name="alert"
+            size={18}
+            color={newFailed > 0 ? '#f85149' : '#58a6ff'}
+            strokeWidth={1.8}
+          />
           <Text style={styles.bannerText}>
             {t('absenceAlert', newCaptures.length, newFailed)}
           </Text>
         </View>
       )}
+
       {captures.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>{t('journalEmpty')}</Text>
@@ -123,54 +160,64 @@ export default function JournalScreen({ decoy }) {
           data={captures}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.card, isNew(item) && styles.cardNew]}
-              onPress={() => setSelected(item)}
-            >
-              <DecryptedImage
-                file={item.thumbUri ?? item.uris[0]}
-                style={styles.photo}
-              />
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
-                <Text
-                  style={[
-                    styles.badge,
-                    item.duress
-                      ? styles.badgeDuress
-                      : item.success
-                        ? styles.badgeOk
-                        : styles.badgeKo,
-                  ]}
-                >
-                  {item.duress
-                    ? t('codeDuress')
-                    : item.success
-                      ? t('codeOk')
-                      : t('codeKo')}
-                </Text>
-                <Text style={styles.cardMeta}>
-                  {t('photoCount', item.uris.length)}
-                  {item.location
-                    ? `  ·  📍 ${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`
-                    : ''}
-                </Text>
-              </View>
-              {isNew(item) && (
-                <View style={styles.newBadge}>
-                  <Text style={styles.newBadgeText}>{t('newBadge')}</Text>
+          renderItem={({ item }) => {
+            const v = verdict(item);
+            return (
+              <TouchableOpacity
+                style={[styles.card, isNew(item) && styles.cardNew]}
+                onPress={() => setSelected(item)}
+              >
+                <DecryptedImage
+                  file={item.thumbUri ?? item.uris[0]}
+                  style={styles.photo}
+                />
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
+                  <Text style={[styles.badge, v.style]}>{v.label}</Text>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.cardMeta}>
+                      {t('photoCount', item.uris.length)}
+                    </Text>
+                    {item.location && (
+                      <>
+                        <Icon name="pin" size={12} color="#8b949e" strokeWidth={2} />
+                        <Text style={styles.cardMeta}>
+                          {item.location.latitude.toFixed(3)},{' '}
+                          {item.location.longitude.toFixed(3)}
+                        </Text>
+                      </>
+                    )}
+                  </View>
                 </View>
-              )}
-            </TouchableOpacity>
-          )}
+                {isNew(item) && (
+                  <View style={styles.newBadge}>
+                    <Text style={styles.newBadgeText}>{t('newBadge')}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
-      {captures.length > 0 && (
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAll}>
-          <Text style={styles.deleteButtonText}>{t('deleteAll')}</Text>
-        </TouchableOpacity>
-      )}
+
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setMenuOpen(false)}
+        >
+          <View style={styles.menuPanel}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleDeleteAll}>
+              <Icon name="trash" size={18} color="#f85149" strokeWidth={1.8} />
+              <Text style={styles.menuItemText}>{t('deleteAll')}</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal visible={selected !== null} animationType="fade" transparent>
         {selected && (
@@ -191,46 +238,53 @@ export default function JournalScreen({ decoy }) {
             </ScrollView>
             <View style={styles.modalHeader}>
               <Text style={styles.modalDate}>{formatDate(selected.date)}</Text>
-              <Text
-                style={[
-                  styles.badge,
-                  selected.duress
-                    ? styles.badgeDuress
-                    : selected.success
-                      ? styles.badgeOk
-                      : styles.badgeKo,
-                ]}
-              >
-                {selected.duress
-                  ? t('codeDuress')
-                  : selected.success
-                    ? t('codeOk')
-                    : t('codeKo')}
+              <Text style={[styles.badge, verdict(selected).style]}>
+                {verdict(selected).label}
               </Text>
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => handleShare(selected.uris[0])}
-              >
-                <Text style={styles.modalButtonText}>↗ {t('share')}</Text>
-              </TouchableOpacity>
+              {selected.location && (
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setMapLocation(selected.location)}
+                >
+                  <Icon name="pin" size={16} color="#fff" strokeWidth={1.9} />
+                  <Text style={styles.modalButtonText}>{t('viewOnMap')}</Text>
+                </TouchableOpacity>
+              )}
+              {selected.uris.length > 0 && (
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => handleShare(selected.uris[0])}
+                >
+                  <Icon name="share" size={16} color="#fff" strokeWidth={1.9} />
+                  <Text style={styles.modalButtonText}>{t('share')}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonDanger]}
                 onPress={() => handleDeleteOne(selected)}
               >
-                <Text style={styles.modalButtonText}>🗑 {t('delete')}</Text>
+                <Icon name="trash" size={16} color="#fff" strokeWidth={1.9} />
+                <Text style={styles.modalButtonText}>{t('delete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => setSelected(null)}
               >
-                <Text style={styles.modalButtonText}>✕ {t('close')}</Text>
+                <Icon name="close" size={16} color="#fff" strokeWidth={1.9} />
+                <Text style={styles.modalButtonText}>{t('close')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
       </Modal>
+
+      <LocationMap
+        location={mapLocation}
+        visible={mapLocation !== null}
+        onClose={() => setMapLocation(null)}
+      />
     </View>
   );
 }
@@ -239,16 +293,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0d1117',
-    paddingTop: 60,
-  },
-  title: {
-    color: '#e6edf3',
-    fontSize: 22,
-    fontWeight: '700',
-    paddingHorizontal: 20,
-    marginBottom: 12,
   },
   banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 12,
@@ -262,6 +311,7 @@ const styles = StyleSheet.create({
     color: '#e6edf3',
     fontSize: 14,
     lineHeight: 20,
+    flexShrink: 1,
   },
   empty: {
     flex: 1,
@@ -291,8 +341,8 @@ const styles = StyleSheet.create({
     borderColor: '#58a6ff',
   },
   photo: {
-    width: 90,
-    height: 90,
+    width: 104,
+    height: 104,
     backgroundColor: '#21262d',
   },
   cardInfo: {
@@ -318,10 +368,15 @@ const styles = StyleSheet.create({
   badgeDuress: {
     color: '#d29922',
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 5,
+  },
   cardMeta: {
     color: '#8b949e',
     fontSize: 12,
-    marginTop: 4,
   },
   newBadge: {
     position: 'absolute',
@@ -337,17 +392,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  deleteButton: {
-    margin: 20,
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#da3633',
-    alignItems: 'center',
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: '#00000055',
   },
-  deleteButtonText: {
-    color: '#ffffff',
+  menuPanel: {
+    position: 'absolute',
+    top: 106,
+    right: 20,
+    backgroundColor: '#21262d',
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 190,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  menuItemText: {
+    color: '#f85149',
     fontSize: 15,
-    fontWeight: '600',
   },
   modal: {
     flex: 1,
@@ -369,15 +436,20 @@ const styles = StyleSheet.create({
   modalActions: {
     position: 'absolute',
     bottom: 50,
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: '#21262d',
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 8,
   },
   modalButtonDanger: {

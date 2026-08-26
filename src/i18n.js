@@ -4,7 +4,6 @@ const fr = {
   appName: 'Antispy',
   choosePin: 'Choisissez votre code PIN',
   confirmPin: 'Confirmez votre code PIN',
-  choosePinLength: 'Longueur du code',
   digits: (n) => `${n} chiffres`,
   duressRemovedByLength:
     'La longueur du code a changé : le code de contrainte a été supprimé, redéfinissez-le si besoin.',
@@ -15,20 +14,19 @@ const fr = {
   cameraWarning: 'Autorisez la caméra pour activer la photo de surveillance.',
   biometricPrompt: 'Déverrouiller Antispy',
   biometricCancel: 'Utiliser le code PIN',
-  biometricButton: '👤 Déverrouiller par empreinte ou visage',
   journal: 'Journal',
   vault: 'Coffre',
   settings: 'Réglages',
-  lock: '🔒 Verrouiller',
+  lock: 'Verrouiller',
   journalTitle: 'Journal des saisies',
   journalEmpty:
     "Aucune photo pour l'instant.\nChaque saisie du code PIN déclenche une photo de la personne devant l'écran.",
   absenceAlert: (total, failed) =>
     failed > 0
-      ? `⚠️ ${total} saisie${total > 1 ? 's' : ''} de code pendant votre absence, dont ${failed} erronée${failed > 1 ? 's' : ''}`
+      ? `${total} saisie${total > 1 ? 's' : ''} de code pendant votre absence, dont ${failed} erronée${failed > 1 ? 's' : ''}`
       : `${total} saisie${total > 1 ? 's' : ''} de code pendant votre absence`,
-  codeOk: '✓ Code correct',
-  codeKo: '✗ Code erroné',
+  codeOk: 'Code correct',
+  codeKo: 'Code erroné',
   newBadge: 'NOUVEAU',
   deleteAll: 'Tout supprimer',
   deleteAllTitle: 'Tout supprimer',
@@ -39,8 +37,12 @@ const fr = {
   close: 'Fermer',
   deleteOneMessage: 'Supprimer cette tentative et ses photos ?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
-  location: 'Position',
+  viewOnMap: 'Voir sur la carte',
+  openInMaps: 'Ouvrir dans Maps',
+  mapPrivacyNote:
+    'La carte est chargée depuis OpenStreetMap uniquement quand vous l’ouvrez.',
   vaultTitle: 'Coffre-fort',
+  menu: 'Autres actions',
   vaultEmpty:
     'Vos notes et photos privées, protégées par le code PIN.\nElles ne quittent jamais le stockage privé de l’application.',
   notes: 'Notes',
@@ -86,7 +88,7 @@ const fr = {
   newDuressPin: 'Nouveau code de contrainte',
   confirmDuressPin: 'Confirmez le code de contrainte',
   duressSameAsPin: 'Ce code est déjà utilisé, choisissez-en un autre.',
-  codeDuress: '⚠ Code de contrainte',
+  codeDuress: 'Code de contrainte',
   wipeSetting: 'Effacer le coffre après 10 codes erronés',
   wipeHelp:
     "Au 10e code PIN erroné consécutif, les notes et photos du vrai coffre sont définitivement supprimées. Le journal des photos de surveillance est conservé.",
@@ -97,7 +99,6 @@ const en = {
   appName: 'Antispy',
   choosePin: 'Choose your PIN code',
   confirmPin: 'Confirm your PIN code',
-  choosePinLength: 'Code length',
   digits: (n) => `${n} digits`,
   duressRemovedByLength:
     'The code length changed: the duress code was removed, set it again if needed.',
@@ -108,20 +109,19 @@ const en = {
   cameraWarning: 'Allow camera access to enable the surveillance photo.',
   biometricPrompt: 'Unlock Antispy',
   biometricCancel: 'Use PIN code',
-  biometricButton: '👤 Unlock with fingerprint or face',
   journal: 'Journal',
   vault: 'Vault',
   settings: 'Settings',
-  lock: '🔒 Lock',
+  lock: 'Lock',
   journalTitle: 'Entry journal',
   journalEmpty:
     'No photos yet.\nEvery PIN entry triggers a photo of the person in front of the screen.',
   absenceAlert: (total, failed) =>
     failed > 0
-      ? `⚠️ ${total} PIN ${total > 1 ? 'entries' : 'entry'} while you were away, including ${failed} failed`
+      ? `${total} PIN ${total > 1 ? 'entries' : 'entry'} while you were away, including ${failed} failed`
       : `${total} PIN ${total > 1 ? 'entries' : 'entry'} while you were away`,
-  codeOk: '✓ Correct code',
-  codeKo: '✗ Wrong code',
+  codeOk: 'Correct code',
+  codeKo: 'Wrong code',
   newBadge: 'NEW',
   deleteAll: 'Delete all',
   deleteAllTitle: 'Delete all',
@@ -132,8 +132,12 @@ const en = {
   close: 'Close',
   deleteOneMessage: 'Delete this attempt and its photos?',
   photoCount: (n) => `${n} photo${n > 1 ? 's' : ''}`,
-  location: 'Location',
+  viewOnMap: 'View on map',
+  openInMaps: 'Open in Maps',
+  mapPrivacyNote:
+    'The map is loaded from OpenStreetMap only when you open it.',
   vaultTitle: 'Vault',
+  menu: 'More actions',
   vaultEmpty:
     'Your private notes and photos, protected by the PIN code.\nThey never leave the app private storage.',
   notes: 'Notes',
@@ -180,7 +184,7 @@ const en = {
   newDuressPin: 'New duress code',
   confirmDuressPin: 'Confirm the duress code',
   duressSameAsPin: 'This code is already in use, choose another one.',
-  codeDuress: '⚠ Duress code',
+  codeDuress: 'Duress code',
   wipeSetting: 'Wipe the vault after 10 wrong codes',
   wipeHelp:
     'On the 10th consecutive wrong PIN, the notes and photos in the real vault are permanently deleted. The surveillance photo journal is kept.',

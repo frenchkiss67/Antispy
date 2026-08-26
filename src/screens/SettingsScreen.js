@@ -13,6 +13,8 @@ import * as Location from 'expo-location';
 import { saveSettings } from '../settings';
 import { isDuressDefined, removeDuressPin } from '../security';
 import { sendIntrusionAlert } from '../webhook';
+import ScreenHeader from '../components/ScreenHeader';
+import Icon from '../components/Icon';
 import t from '../i18n';
 
 const GRACE_OPTIONS = [0, 30, 60, 300];
@@ -32,6 +34,7 @@ export default function SettingsScreen({
   onSettingsChange,
   onChangePin,
   onSetDuress,
+  onLock,
   decoy,
 }) {
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
@@ -48,8 +51,10 @@ export default function SettingsScreen({
     onSettingsChange(await saveSettings(partial));
   };
 
-  const handleWebhookSave = () => {
-    const trimmed = webhookUrl.trim();
+  // La valeur validée est lue sur l'événement, pas dans l'état : à la fin de
+  // saisie, l'état peut ne pas encore avoir été répercuté.
+  const handleWebhookSave = (value) => {
+    const trimmed = (value ?? webhookUrl).trim();
     if (trimmed !== '' && !/^https:\/\//i.test(trimmed)) {
       Alert.alert(t('webhook'), t('webhookHttpsOnly'));
       return;
@@ -82,8 +87,13 @@ export default function SettingsScreen({
   };
 
   const handleWebhookTest = async () => {
+    const url = webhookUrl.trim();
+    if (!/^https:\/\//i.test(url)) {
+      Alert.alert(t('webhook'), t('webhookHttpsOnly'));
+      return;
+    }
     setTesting(true);
-    const ok = await sendIntrusionAlert(webhookUrl.trim(), {
+    const ok = await sendIntrusionAlert(url, {
       date: new Date().toISOString(),
       test: true,
     });
@@ -92,11 +102,13 @@ export default function SettingsScreen({
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{t('settingsTitle')}</Text>
+    <View style={styles.container}>
+      <ScreenHeader title={t('settingsTitle')} onLock={onLock} />
+      <ScrollView contentContainerStyle={styles.content}>
 
       <TouchableOpacity style={styles.actionButton} onPress={onChangePin}>
-        <Text style={styles.actionButtonText}>🔑 {t('changePin')}</Text>
+        <Icon name="key" size={18} color="#e6edf3" strokeWidth={1.8} />
+        <Text style={styles.actionButtonText}>{t('changePin')}</Text>
       </TouchableOpacity>
 
       {!decoy && (
@@ -190,7 +202,7 @@ export default function SettingsScreen({
             style={styles.input}
             value={webhookUrl}
             onChangeText={setWebhookUrl}
-            onEndEditing={handleWebhookSave}
+            onEndEditing={(e) => handleWebhookSave(e?.nativeEvent?.text)}
             placeholder={t('webhookPlaceholder')}
             placeholderTextColor="#8b949e"
             autoCapitalize="none"
@@ -213,7 +225,8 @@ export default function SettingsScreen({
       )}
 
       {!decoy && <Text style={styles.about}>{t('about')}</Text>}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -223,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d1117',
   },
   content: {
-    paddingTop: 60,
+    paddingTop: 6,
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
@@ -234,6 +247,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#21262d',
     paddingVertical: 14,
     paddingHorizontal: 16,
